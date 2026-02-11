@@ -1,0 +1,32 @@
+# Copilot instructions (skeleton)
+
+This is a starter template for repositories created inside Agentbox.
+
+## Mandatory: use the Makefile
+
+Use `make` targets for build/lint/test/format/dev flows whenever available.
+If you need a new workflow step, add a Make target rather than running ad-hoc commands.
+
+## Common workflows (expected Make targets)
+
+- `make help` -- list targets
+- `make install` / `make install-dev` -- install dependencies
+- `make lint` / `make format` -- static checks / formatting
+- `make test` -- run tests
+- `make coverage` -- run tests with coverage (if available)
+- `make check` -- run the project's standard validation pipeline
+- `make clean` -- remove local build/test artifacts
+
+## CI/CD convention
+
+CI should call `make check` (or `make lint` + `make test` when `check` doesn't exist).
+Keep CI logic minimal; prefer Make targets for consistency.
+
+## Environment and Package Management
+
+If `AGENTBOX_ENVIRONMENT` is set, then:
+
+- You have `uv` and `brew` to install whatever tooling you require (as well as `sudo apt`)
+- You should install Python packages with `--user --break-system-packages` rather than use a `venv` to minimize workspace size
+- You _may_ have `docker` installed (but disabled - check first before using it)
+- If it is set to `gui`, then you have a running X server at :10
