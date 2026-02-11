@@ -98,8 +98,130 @@ func (h *HistoryScreen) afterEvent(event string) {
 }
 
 func (h *HistoryScreen) Reset() {
+	h.beforeEvent("reset")
 	h.Screen.Reset()
 	h.resetHistory()
+	h.afterEvent("reset")
+}
+
+func (h *HistoryScreen) Bell() {
+	h.beforeEvent("bell")
+	h.Screen.Bell()
+	h.afterEvent("bell")
+}
+
+func (h *HistoryScreen) Backspace() {
+	h.beforeEvent("backspace")
+	h.Screen.Backspace()
+	h.afterEvent("backspace")
+}
+
+func (h *HistoryScreen) Tab() {
+	h.beforeEvent("tab")
+	h.Screen.Tab()
+	h.afterEvent("tab")
+}
+
+func (h *HistoryScreen) CarriageReturn() {
+	h.beforeEvent("carriage_return")
+	h.Screen.CarriageReturn()
+	h.afterEvent("carriage_return")
+}
+
+func (h *HistoryScreen) ShiftOut() {
+	h.beforeEvent("shift_out")
+	h.Screen.ShiftOut()
+	h.afterEvent("shift_out")
+}
+
+func (h *HistoryScreen) ShiftIn() {
+	h.beforeEvent("shift_in")
+	h.Screen.ShiftIn()
+	h.afterEvent("shift_in")
+}
+
+func (h *HistoryScreen) SetTabStop() {
+	h.beforeEvent("set_tab_stop")
+	h.Screen.SetTabStop()
+	h.afterEvent("set_tab_stop")
+}
+
+func (h *HistoryScreen) ClearTabStop(how int) {
+	h.beforeEvent("clear_tab_stop")
+	h.Screen.ClearTabStop(how)
+	h.afterEvent("clear_tab_stop")
+}
+
+func (h *HistoryScreen) SaveCursor() {
+	h.beforeEvent("save_cursor")
+	h.Screen.SaveCursor()
+	h.afterEvent("save_cursor")
+}
+
+func (h *HistoryScreen) RestoreCursor() {
+	h.beforeEvent("restore_cursor")
+	h.Screen.RestoreCursor()
+	h.afterEvent("restore_cursor")
+}
+
+func (h *HistoryScreen) AlignmentDisplay() {
+	h.beforeEvent("alignment_display")
+	h.Screen.AlignmentDisplay()
+	h.afterEvent("alignment_display")
+}
+
+func (h *HistoryScreen) InsertCharacters(count int) {
+	h.beforeEvent("insert_characters")
+	h.Screen.InsertCharacters(count)
+	h.afterEvent("insert_characters")
+}
+
+func (h *HistoryScreen) CursorUp(count int) {
+	h.beforeEvent("cursor_up")
+	h.Screen.CursorUp(count)
+	h.afterEvent("cursor_up")
+}
+
+func (h *HistoryScreen) CursorDown(count int) {
+	h.beforeEvent("cursor_down")
+	h.Screen.CursorDown(count)
+	h.afterEvent("cursor_down")
+}
+
+func (h *HistoryScreen) CursorForward(count int) {
+	h.beforeEvent("cursor_forward")
+	h.Screen.CursorForward(count)
+	h.afterEvent("cursor_forward")
+}
+
+func (h *HistoryScreen) CursorBack(count int) {
+	h.beforeEvent("cursor_back")
+	h.Screen.CursorBack(count)
+	h.afterEvent("cursor_back")
+}
+
+func (h *HistoryScreen) CursorDown1(count int) {
+	h.beforeEvent("cursor_down1")
+	h.Screen.CursorDown1(count)
+	h.afterEvent("cursor_down1")
+}
+
+func (h *HistoryScreen) CursorUp1(count int) {
+	h.beforeEvent("cursor_up1")
+	h.Screen.CursorUp1(count)
+	h.afterEvent("cursor_up1")
+}
+
+func (h *HistoryScreen) CursorToColumn(column int) {
+	h.beforeEvent("cursor_to_column")
+	h.Screen.CursorToColumn(column)
+	h.afterEvent("cursor_to_column")
+}
+
+func (h *HistoryScreen) CursorPosition(line, column int) {
+	h.beforeEvent("cursor_position")
+	h.Screen.CursorPosition(line, column)
+	h.afterEvent("cursor_position")
 }
 
 func (h *HistoryScreen) EraseInDisplay(how int, private bool, rest ...int) {
@@ -109,6 +231,96 @@ func (h *HistoryScreen) EraseInDisplay(how int, private bool, rest ...int) {
 		h.resetHistory()
 	}
 	h.afterEvent("erase_in_display")
+}
+
+func (h *HistoryScreen) EraseInLine(how int, private bool) {
+	h.beforeEvent("erase_in_line")
+	h.Screen.EraseInLine(how, private)
+	h.afterEvent("erase_in_line")
+}
+
+func (h *HistoryScreen) InsertLines(count int) {
+	h.beforeEvent("insert_lines")
+	h.Screen.InsertLines(count)
+	h.afterEvent("insert_lines")
+}
+
+func (h *HistoryScreen) DeleteLines(count int) {
+	h.beforeEvent("delete_lines")
+	h.Screen.DeleteLines(count)
+	h.afterEvent("delete_lines")
+}
+
+func (h *HistoryScreen) DeleteCharacters(count int) {
+	h.beforeEvent("delete_characters")
+	h.Screen.DeleteCharacters(count)
+	h.afterEvent("delete_characters")
+}
+
+func (h *HistoryScreen) EraseCharacters(count int) {
+	h.beforeEvent("erase_characters")
+	h.Screen.EraseCharacters(count)
+	h.afterEvent("erase_characters")
+}
+
+func (h *HistoryScreen) ReportDeviceAttributes(mode int, private bool) {
+	h.beforeEvent("report_device_attributes")
+	h.Screen.ReportDeviceAttributes(mode, private)
+	h.afterEvent("report_device_attributes")
+}
+
+func (h *HistoryScreen) CursorToLine(line int) {
+	h.beforeEvent("cursor_to_line")
+	h.Screen.CursorToLine(line)
+	h.afterEvent("cursor_to_line")
+}
+
+func (h *HistoryScreen) ReportDeviceStatus(mode int) {
+	h.beforeEvent("report_device_status")
+	h.Screen.ReportDeviceStatus(mode)
+	h.afterEvent("report_device_status")
+}
+
+func (h *HistoryScreen) SetMargins(top, bottom int) {
+	h.beforeEvent("set_margins")
+	h.Screen.SetMargins(top, bottom)
+	h.afterEvent("set_margins")
+}
+
+func (h *HistoryScreen) SelectGraphicRendition(attrs []int, private bool) {
+	h.beforeEvent("select_graphic_rendition")
+	h.Screen.SelectGraphicRendition(attrs, private)
+	h.afterEvent("select_graphic_rendition")
+}
+
+func (h *HistoryScreen) SetMode(modes []int, private bool) {
+	h.beforeEvent("set_mode")
+	h.Screen.SetMode(modes, private)
+	h.afterEvent("set_mode")
+}
+
+func (h *HistoryScreen) ResetMode(modes []int, private bool) {
+	h.beforeEvent("reset_mode")
+	h.Screen.ResetMode(modes, private)
+	h.afterEvent("reset_mode")
+}
+
+func (h *HistoryScreen) DefineCharset(code, mode string) {
+	h.beforeEvent("define_charset")
+	h.Screen.DefineCharset(code, mode)
+	h.afterEvent("define_charset")
+}
+
+func (h *HistoryScreen) SetTitle(param string) {
+	h.beforeEvent("set_title")
+	h.Screen.SetTitle(param)
+	h.afterEvent("set_title")
+}
+
+func (h *HistoryScreen) SetIconName(param string) {
+	h.beforeEvent("set_icon_name")
+	h.Screen.SetIconName(param)
+	h.afterEvent("set_icon_name")
 }
 
 func (h *HistoryScreen) Index() {

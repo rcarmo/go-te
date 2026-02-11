@@ -70,7 +70,6 @@ func (s *Screen) Reset() {
 		s.TabStops[col] = struct{}{}
 	}
 	s.Cursor = Cursor{Row: 0, Col: 0, Attr: s.defaultAttr(), Hidden: false}
-	s.Savepoints = nil
 	s.SavedColumns = nil
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
@@ -174,6 +173,7 @@ func (s *Screen) LinesCells() [][]Cell {
 func (s *Screen) Draw(data string) {
 	data = s.translate(data)
 	graphemes := uniseg.NewGraphemes(data)
+loop:
 	for graphemes.Next() {
 		cluster := graphemes.Str()
 		width := runewidth.StringWidth(cluster)
@@ -214,7 +214,7 @@ func (s *Screen) Draw(data string) {
 				prevLine[s.Columns-1] = Cell{Data: norm.NFC.String(prev.Data + cluster), Attr: prev.Attr}
 			}
 		default:
-			continue
+			break loop
 		}
 
 		if width > 0 {
@@ -315,13 +315,9 @@ func (s *Screen) RestoreCursor() {
 	s.Charset = last.Charset
 	if last.Origin {
 		s.SetMode([]int{ModeDECOM}, false)
-	} else {
-		s.ResetMode([]int{ModeDECOM}, false)
 	}
 	if last.Wrap {
 		s.SetMode([]int{ModeDECAWM}, false)
-	} else {
-		s.ResetMode([]int{ModeDECAWM}, false)
 	}
 	s.Cursor = last.Cursor
 	s.ensureHB()
@@ -408,9 +404,6 @@ func (s *Screen) EraseCharacters(count int) {
 }
 
 func (s *Screen) EraseInLine(how int, private bool) {
-	if private {
-		return
-	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
 	var start, end int
@@ -431,9 +424,6 @@ func (s *Screen) EraseInLine(how int, private bool) {
 }
 
 func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
-	if private {
-		return
-	}
 	var start, end int
 	switch how {
 	case 0:
