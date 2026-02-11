@@ -67,6 +67,7 @@ const (
 	stateGround parserState = iota
 	stateEscape
 	stateCSI
+	stateEscapeCharset
 )
 
 func NewStream(screen ScreenLike, strict bool) *Stream {
@@ -97,6 +98,8 @@ func (st *Stream) feedRune(ch rune) error {
 		return st.handleEscape(ch)
 	case stateCSI:
 		return st.handleCSI(ch)
+	case stateEscapeCharset:
+		return st.handleCharset(ch)
 	default:
 		st.state = stateGround
 	}
@@ -165,12 +168,21 @@ func (st *Stream) handleEscape(ch rune) error {
 		cursor := st.screen.Cursor()
 		st.screen.SetTabStop(cursor.Col)
 		return nil
+	case '(', ')':
+		st.state = stateEscapeCharset
+		return nil
 	default:
 		if st.strict {
 			return ErrInvalidSequence
 		}
 		return nil
 	}
+}
+
+func (st *Stream) handleCharset(ch rune) error {
+	st.state = stateGround
+	_ = ch
+	return nil
 }
 
 func (st *Stream) handleCSI(ch rune) error {
