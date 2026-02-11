@@ -2,63 +2,67 @@ package te
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
-	"strings"
+	"unicode/utf8"
 )
 
-var ErrInvalidSequence = errors.New("invalid control sequence")
+var ErrNoListener = errors.New("listener is not set")
 
-type ScreenLike interface {
-	PutRune(ch rune)
+type EventHandler interface {
+	Bell()
 	Backspace()
 	Tab()
 	LineFeed()
 	CarriageReturn()
-	MoveCursor(rowDelta, colDelta int)
-	SetCursor(row, col int)
-	Cursor() Cursor
-	Size() (cols, lines int)
+	ShiftOut()
+	ShiftIn()
+	Reset()
+	Index()
+	ReverseIndex()
+	SetTabStop()
+	ClearTabStop(how int)
 	SaveCursor()
 	RestoreCursor()
-	EraseInDisplay(mode int)
-	EraseInLine(mode int)
-	EraseChars(n int)
-	DeleteChars(n int)
-	InsertChars(n int)
-	DeleteLines(n int)
-	InsertLines(n int)
-	ScrollUp(n int)
-	ScrollDown(n int)
-	SetScrollRegion(top, bottom int)
-	SetTabStop(col int)
-	ClearTabStop(col int)
-	SetInsertMode(enabled bool)
-	SetAutowrap(enabled bool)
-	SetOriginMode(enabled bool)
-	SetNewlineMode(enabled bool)
-	ApplySGR(params []int)
-	Reset()
+	AlignmentDisplay()
+	InsertCharacters(count int)
+	CursorUp(count int)
+	CursorDown(count int)
+	CursorForward(count int)
+	CursorBack(count int)
+	CursorDown1(count int)
+	CursorUp1(count int)
+	CursorToColumn(column int)
+	CursorPosition(line, col int)
+	EraseInDisplay(how int, private bool, rest ...int)
+	EraseInLine(how int, private bool)
+	InsertLines(count int)
+	DeleteLines(count int)
+	DeleteCharacters(count int)
+	EraseCharacters(count int)
+	ReportDeviceAttributes(mode int, private bool)
+	CursorToLine(line int)
+	ReportDeviceStatus(mode int)
+	SetMargins(top, bottom int)
+	SelectGraphicRendition(attrs []int, private bool)
+	Draw(data string)
+	Debug(params ...interface{})
+	SetMode(modes []int, private bool)
+	ResetMode(modes []int, private bool)
+	DefineCharset(code, mode string)
+	SetTitle(param string)
+	SetIconName(param string)
 }
 
 type Stream struct {
-	screen       ScreenLike
-	strict       bool
-	state        parserState
-	params       []int
-	paramBuf     strings.Builder
-	private      bool
-	seenParam    bool
-	intermediate strings.Builder
-}
-
-type tabStopClearAll interface {
-	ClearAllTabStops()
-}
-
-type alternateBuffer interface {
-	EnableAlternateBuffer(clear bool)
-	DisableAlternateBuffer()
+	listener   EventHandler
+	strict     bool
+	useUTF8    bool
+	state      parserState
+	params     []int
+	current    string
+	private    bool
+	takingText bool
+	oscEsc     bool
+	skipNext   bool
 }
 
 type parserState int
@@ -67,39 +71,111 @@ const (
 	stateGround parserState = iota
 	stateEscape
 	stateCSI
-	stateEscapeCharset
+	stateSharp
+	stateOSC
+	stateCharset
+	stateEscapePercent
 )
 
-func NewStream(screen ScreenLike, strict bool) *Stream {
-	return &Stream{screen: screen, strict: strict}
-}
-
-func (st *Stream) Attach(screen ScreenLike) {
-	st.screen = screen
-}
-
-func (st *Stream) FeedString(data string) error {
-	if st.screen == nil {
-		return nil
+func NewStream(screen EventHandler, strict bool) *Stream {
+	st := &Stream{strict: strict, useUTF8: true}
+	if screen != nil {
+		st.Attach(screen)
 	}
+	return st
+}
+
+func (st *Stream) Attach(screen EventHandler) {
+	st.listener = screen
+	st.state = stateGround
+	st.params = nil
+	st.current = ""
+	st.private = false
+	st.takingText = false
+	st.oscEsc = false
+	st.skipNext = false
+}
+
+func (st *Stream) Detach(screen EventHandler) {
+	if st.listener == screen {
+		st.listener = nil
+	}
+}
+
+func (st *Stream) Feed(data string) (err error) {
+	if st.listener == nil {
+		return ErrNoListener
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			st.state = stateGround
+			st.resetCSI()
+			st.oscEsc = false
+			st.skipNext = false
+			err = errors.New("handler panic")
+		}
+	}()
+
+	var textBuf []rune
+	flush := func() {
+		if len(textBuf) > 0 {
+			st.listener.Draw(string(textBuf))
+			textBuf = textBuf[:0]
+		}
+	}
+
 	for _, ch := range data {
+		if st.skipNext {
+			flush()
+			if err := st.feedRune(ch); err != nil {
+				return err
+			}
+			continue
+		}
+		if st.isPlainText(ch) && st.state == stateGround {
+			textBuf = append(textBuf, ch)
+			continue
+		}
+		flush()
 		if err := st.feedRune(ch); err != nil {
 			return err
 		}
 	}
+	flush()
 	return nil
 }
 
 func (st *Stream) feedRune(ch rune) error {
+	if st.skipNext {
+		st.skipNext = false
+		return nil
+	}
 	switch st.state {
 	case stateGround:
 		return st.handleGround(ch)
 	case stateEscape:
 		return st.handleEscape(ch)
+	case stateSharp:
+		st.state = stateGround
+		if ch == '8' {
+			st.listener.AlignmentDisplay()
+		}
+		return nil
+	case stateCharset:
+		st.state = stateGround
+		if st.useUTF8 {
+			return nil
+		}
+		st.listener.DefineCharset(string(ch), st.current)
+		return nil
+	case stateEscapePercent:
+		st.state = stateGround
+		st.SelectOtherCharset(string(ch))
+		return nil
 	case stateCSI:
 		return st.handleCSI(ch)
-	case stateEscapeCharset:
-		return st.handleCharset(ch)
+	case stateOSC:
+		return st.handleOSC(ch)
 	default:
 		st.state = stateGround
 	}
@@ -108,28 +184,37 @@ func (st *Stream) feedRune(ch rune) error {
 
 func (st *Stream) handleGround(ch rune) error {
 	switch ch {
-	case 0x07:
-		return nil
-	case 0x08:
-		st.screen.Backspace()
-		return nil
-	case 0x09:
-		st.screen.Tab()
-		return nil
-	case 0x0a, 0x0b, 0x0c:
-		st.screen.LineFeed()
-		return nil
-	case 0x0d:
-		st.screen.CarriageReturn()
-		return nil
-	case 0x1b:
+	case '\x07':
+		st.listener.Bell()
+	case '\x08':
+		st.listener.Backspace()
+	case '\t':
+		st.listener.Tab()
+	case '\n', '\x0b', '\x0c':
+		st.listener.LineFeed()
+	case '\r':
+		st.listener.CarriageReturn()
+	case '\x0e':
+		if !st.useUTF8 {
+			st.listener.ShiftOut()
+		}
+	case '\x0f':
+		if !st.useUTF8 {
+			st.listener.ShiftIn()
+		}
+	case '\x1b':
 		st.state = stateEscape
+	case '\x9b':
+		st.state = stateCSI
+		st.resetCSI()
+	case '\x9d':
+		st.state = stateOSC
+		st.current = ""
+		st.oscEsc = false
+	case '\x00', '\x7f':
 		return nil
-	case 0x7f:
-		return nil
-	}
-	if ch >= 0x20 {
-		st.screen.PutRune(ch)
+	default:
+		st.listener.Draw(string(ch))
 	}
 	return nil
 }
@@ -139,221 +224,248 @@ func (st *Stream) handleEscape(ch rune) error {
 	switch ch {
 	case '[':
 		st.state = stateCSI
-		st.params = st.params[:0]
-		st.paramBuf.Reset()
-		st.private = false
-		st.seenParam = false
-		st.intermediate.Reset()
-		return nil
-	case '7':
-		st.screen.SaveCursor()
-		return nil
-	case '8':
-		st.screen.RestoreCursor()
-		return nil
-	case 'D':
-		st.screen.LineFeed()
-		return nil
-	case 'M':
-		st.screen.ScrollDown(1)
-		return nil
-	case 'E':
-		st.screen.CarriageReturn()
-		st.screen.LineFeed()
-		return nil
-	case 'c':
-		st.screen.Reset()
-		return nil
-	case 'H':
-		cursor := st.screen.Cursor()
-		st.screen.SetTabStop(cursor.Col)
-		return nil
+		st.resetCSI()
+	case ']':
+		st.state = stateOSC
+		st.current = ""
+		st.oscEsc = false
+	case '#':
+		st.state = stateSharp
+	case '%':
+		st.current = ""
+		st.state = stateEscapePercent
 	case '(', ')':
-		st.state = stateEscapeCharset
-		return nil
+		st.current = string(ch)
+		st.state = stateCharset
+	case 'c':
+		st.listener.Reset()
+	case 'D':
+		st.listener.Index()
+	case 'E':
+		st.listener.LineFeed()
+	case 'M':
+		st.listener.ReverseIndex()
+	case 'H':
+		st.listener.SetTabStop()
+	case '7':
+		st.listener.SaveCursor()
+	case '8':
+		st.listener.RestoreCursor()
 	default:
-		if st.strict {
-			return ErrInvalidSequence
-		}
 		return nil
 	}
-}
-
-func (st *Stream) handleCharset(ch rune) error {
-	st.state = stateGround
-	_ = ch
 	return nil
 }
 
 func (st *Stream) handleCSI(ch rune) error {
-	if ch >= 0x30 && ch <= 0x3f {
-		st.seenParam = true
-		if ch == '?' && st.paramBuf.Len() == 0 && len(st.params) == 0 {
-			st.private = true
-			return nil
-		}
-		st.paramBuf.WriteRune(ch)
+	if ch == '?' {
+		st.private = true
 		return nil
 	}
-	if ch >= 0x20 && ch <= 0x2f {
-		st.intermediate.WriteRune(ch)
+	if ch >= '0' && ch <= '9' {
+		st.current += string(ch)
 		return nil
 	}
-	if ch >= 0x40 && ch <= 0x7e {
-		params := st.parseParams()
+	if ch == ';' {
+		st.appendParam()
+		return nil
+	}
+	if isControlInCSI(ch) {
+		st.dispatchControl(ch)
+		return nil
+	}
+	if ch == '$' {
 		st.state = stateGround
-		err := st.dispatchCSI(ch, params)
-		st.private = false
-		return err
+		st.skipNext = true
+		return nil
 	}
+	if ch == '\x18' || ch == '\x1a' {
+		st.state = stateGround
+		st.listener.Draw(string(ch))
+		return nil
+	}
+	if ch == ' ' || ch == '>' {
+		return nil
+	}
+
+	st.appendParam()
+	params := st.params
 	st.state = stateGround
-	st.private = false
-	if st.strict {
-		return ErrInvalidSequence
-	}
+	st.dispatchCSI(ch, params)
 	return nil
 }
 
-func (st *Stream) parseParams() []int {
-	if !st.seenParam || st.paramBuf.Len() == 0 {
-		return nil
-	}
-	parts := strings.Split(st.paramBuf.String(), ";")
-	params := make([]int, 0, len(parts))
-	for _, part := range parts {
-		if part == "" {
-			params = append(params, 0)
-			continue
-		}
-		value, err := strconv.Atoi(part)
-		if err != nil {
-			params = append(params, 0)
-			continue
-		}
-		params = append(params, value)
-	}
-	return params
-}
-
-func (st *Stream) dispatchCSI(final rune, params []int) error {
-	switch final {
-	case 'A':
-		st.screen.MoveCursor(-defaultParam(params, 0, 1), 0)
-	case 'B':
-		st.screen.MoveCursor(defaultParam(params, 0, 1), 0)
-	case 'C':
-		st.screen.MoveCursor(0, defaultParam(params, 0, 1))
-	case 'D':
-		st.screen.MoveCursor(0, -defaultParam(params, 0, 1))
-	case 'E':
-		st.screen.MoveCursor(defaultParam(params, 0, 1), 0)
-		st.screen.CarriageReturn()
-	case 'F':
-		st.screen.MoveCursor(-defaultParam(params, 0, 1), 0)
-		st.screen.CarriageReturn()
-	case 'G':
-		st.screen.SetCursor(st.screen.Cursor().Row, defaultParam(params, 0, 1)-1)
-	case 'd':
-		st.screen.SetCursor(defaultParam(params, 0, 1)-1, st.screen.Cursor().Col)
-	case 'H', 'f':
-		row := defaultParam(params, 0, 1) - 1
-		col := defaultParam(params, 1, 1) - 1
-		st.screen.SetCursor(row, col)
-	case 'J':
-		st.screen.EraseInDisplay(defaultParam(params, 0, 0))
-	case 'K':
-		st.screen.EraseInLine(defaultParam(params, 0, 0))
-	case 'g':
-		mode := defaultParam(params, 0, 0)
-		switch mode {
-		case 0:
-			cursor := st.screen.Cursor()
-			st.screen.ClearTabStop(cursor.Col)
-		case 3:
-			if target, ok := st.screen.(tabStopClearAll); ok {
-				target.ClearAllTabStops()
-			}
-		}
-	case 'X':
-		st.screen.EraseChars(defaultParam(params, 0, 1))
-	case 'P':
-		st.screen.DeleteChars(defaultParam(params, 0, 1))
-	case '@':
-		st.screen.InsertChars(defaultParam(params, 0, 1))
-	case 'L':
-		st.screen.InsertLines(defaultParam(params, 0, 1))
-	case 'M':
-		st.screen.DeleteLines(defaultParam(params, 0, 1))
-	case 'S':
-		st.screen.ScrollUp(defaultParam(params, 0, 1))
-	case 'T':
-		st.screen.ScrollDown(defaultParam(params, 0, 1))
-	case 'r':
-		_, lines := st.screen.Size()
-		if len(params) == 0 {
-			st.screen.SetScrollRegion(0, lines-1)
+func (st *Stream) handleOSC(ch rune) error {
+	if st.oscEsc {
+		st.oscEsc = false
+		if ch == '\\' {
+			st.state = stateGround
+			st.finishOSC()
 			return nil
 		}
-		top := defaultParam(params, 0, 1) - 1
-		bottom := defaultParam(params, 1, lines) - 1
-		st.screen.SetScrollRegion(top, bottom)
-	case 'm':
-		st.screen.ApplySGR(params)
-	case 's':
-		st.screen.SaveCursor()
-	case 'u':
-		st.screen.RestoreCursor()
-	case 'h':
-		return st.setMode(params, true)
-	case 'l':
-		return st.setMode(params, false)
-	default:
-		if st.strict {
-			return fmt.Errorf("%w: CSI %c", ErrInvalidSequence, final)
-		}
+		st.current += string('\x1b')
+		st.current += string(ch)
+		return nil
 	}
+	if ch == '\x07' || ch == '\x9c' {
+		st.state = stateGround
+		st.finishOSC()
+		return nil
+	}
+	if ch == '\x1b' {
+		st.oscEsc = true
+		return nil
+	}
+	st.current += string(ch)
 	return nil
 }
 
-func (st *Stream) setMode(params []int, enabled bool) error {
-	if st.private {
-		for _, p := range params {
-			switch p {
-			case 6:
-				st.screen.SetOriginMode(enabled)
-			case 7:
-				st.screen.SetAutowrap(enabled)
-			case 47, 1047:
-				if target, ok := st.screen.(alternateBuffer); ok {
-					if enabled {
-						target.EnableAlternateBuffer(true)
-					} else {
-						target.DisableAlternateBuffer()
-					}
-				}
-			case 1049:
-				if target, ok := st.screen.(alternateBuffer); ok {
-					if enabled {
-						st.screen.SaveCursor()
-						target.EnableAlternateBuffer(true)
-					} else {
-						target.DisableAlternateBuffer()
-						st.screen.RestoreCursor()
-					}
-				}
+func (st *Stream) finishOSC() {
+	if st.current == "" {
+		return
+	}
+	code, rest := st.current[0], ""
+	if len(st.current) > 1 {
+		rest = st.current[1:]
+	}
+	if len(rest) > 0 && rest[0] == ';' {
+		rest = rest[1:]
+	}
+	switch code {
+	case '0':
+		st.listener.SetIconName(rest)
+		st.listener.SetTitle(rest)
+	case '1':
+		st.listener.SetIconName(rest)
+	case '2':
+		st.listener.SetTitle(rest)
+	}
+	st.current = ""
+}
+
+func (st *Stream) resetCSI() {
+	st.params = st.params[:0]
+	st.current = ""
+	st.private = false
+}
+
+func (st *Stream) appendParam() {
+	value := 0
+	if st.current != "" {
+		for _, r := range st.current {
+			value = value*10 + int(r-'0')
+			if value > 9999 {
+				value = 9999
+				break
 			}
 		}
-		return nil
 	}
-	for _, p := range params {
-		switch p {
-		case 4:
-			st.screen.SetInsertMode(enabled)
-		case 20:
-			st.screen.SetNewlineMode(enabled)
+	st.params = append(st.params, value)
+	st.current = ""
+}
+
+func (st *Stream) dispatchCSI(final rune, params []int) {
+	switch final {
+	case '@':
+		st.listener.InsertCharacters(defaultParam(params, 0, 1))
+	case 'A':
+		st.listener.CursorUp(defaultParam(params, 0, 1))
+	case 'B':
+		st.listener.CursorDown(defaultParam(params, 0, 1))
+	case 'C':
+		st.listener.CursorForward(defaultParam(params, 0, 1))
+	case 'D':
+		st.listener.CursorBack(defaultParam(params, 0, 1))
+	case 'E':
+		st.listener.CursorDown1(defaultParam(params, 0, 1))
+	case 'F':
+		st.listener.CursorUp1(defaultParam(params, 0, 1))
+	case 'G':
+		st.listener.CursorToColumn(defaultParam(params, 0, 1))
+	case 'H', 'f':
+		st.listener.CursorPosition(defaultParam(params, 0, 0), defaultParam(params, 1, 0))
+	case 'J':
+		st.listener.EraseInDisplay(defaultParam(params, 0, 0), st.private)
+	case 'K':
+		st.listener.EraseInLine(defaultParam(params, 0, 0), st.private)
+	case 'L':
+		st.listener.InsertLines(defaultParam(params, 0, 1))
+	case 'M':
+		st.listener.DeleteLines(defaultParam(params, 0, 1))
+	case 'P':
+		st.listener.DeleteCharacters(defaultParam(params, 0, 1))
+	case 'X':
+		st.listener.EraseCharacters(defaultParam(params, 0, 1))
+	case 'a':
+		st.listener.CursorForward(defaultParam(params, 0, 1))
+	case 'c':
+		st.listener.ReportDeviceAttributes(defaultParam(params, 0, 0), st.private)
+	case 'd':
+		st.listener.CursorToLine(defaultParam(params, 0, 1))
+	case 'e':
+		st.listener.CursorDown(defaultParam(params, 0, 1))
+	case 'g':
+		st.listener.ClearTabStop(defaultParam(params, 0, 0))
+	case 'h':
+		st.listener.SetMode(params, st.private)
+	case 'l':
+		st.listener.ResetMode(params, st.private)
+	case 'm':
+		st.listener.SelectGraphicRendition(params, st.private)
+	case 'n':
+		st.listener.ReportDeviceStatus(defaultParam(params, 0, 0))
+	case 'r':
+		if len(params) == 0 {
+			st.listener.SetMargins(0, 0)
+			return
 		}
+		top := defaultParam(params, 0, 0)
+		bottom := 0
+		if len(params) > 1 {
+			bottom = params[1]
+		}
+		st.listener.SetMargins(top, bottom)
+	case '\'':
+		st.listener.CursorToColumn(defaultParam(params, 0, 1))
+	default:
+		args := make([]interface{}, len(params))
+		for i, v := range params {
+			args[i] = v
+		}
+		st.listener.Debug(args...)
 	}
-	return nil
+}
+
+func (st *Stream) SelectOtherCharset(code string) {
+	if code == "@" {
+		st.useUTF8 = false
+	} else if code == "G" || code == "8" {
+		st.useUTF8 = true
+	}
+}
+
+func isControlInCSI(ch rune) bool {
+	switch ch {
+	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r':
+		return true
+	default:
+		return false
+	}
+}
+
+func (st *Stream) dispatchControl(ch rune) {
+	switch ch {
+	case '\x07':
+		st.listener.Bell()
+	case '\x08':
+		st.listener.Backspace()
+	case '\t':
+		st.listener.Tab()
+	case '\n', '\x0b', '\x0c':
+		st.listener.LineFeed()
+	case '\r':
+		st.listener.CarriageReturn()
+	}
 }
 
 func defaultParam(params []int, index int, fallback int) int {
@@ -364,4 +476,18 @@ func defaultParam(params []int, index int, fallback int) int {
 		return params[index]
 	}
 	return fallback
+}
+
+func (st *Stream) isPlainText(ch rune) bool {
+	if ch == utf8.RuneError {
+		return false
+	}
+	if ch == '\x1b' || ch == '\x9b' || ch == '\x9d' || ch == '\x00' || ch == '\x7f' {
+		return false
+	}
+	switch ch {
+	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f':
+		return false
+	}
+	return true
 }

@@ -1,622 +1,975 @@
 package te
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+	"unicode"
 
-type Screen struct {
-	cols         int
-	lines        int
-	cells        [][]Cell
-	cursor       Cursor
-	savedCursor  Cursor
-	attr         Attr
-	insertMode   bool
-	originMode   bool
-	autowrap     bool
-	newlineMode  bool
-	wrapPending  bool
-	scrollTop    int
-	scrollBottom int
-	tabStops     map[int]struct{}
-	usingAlt     bool
-	primary      bufferState
+	"github.com/mattn/go-runewidth"
+	"github.com/rivo/uniseg"
+	"golang.org/x/text/unicode/norm"
+)
+
+type Margins struct {
+	Top    int
+	Bottom int
 }
 
-type bufferState struct {
-	cells        [][]Cell
-	cursor       Cursor
-	savedCursor  Cursor
-	attr         Attr
-	insertMode   bool
-	originMode   bool
-	autowrap     bool
-	newlineMode  bool
-	wrapPending  bool
-	scrollTop    int
-	scrollBottom int
-	tabStops     map[int]struct{}
+type Savepoint struct {
+	Cursor   Cursor
+	G0       []rune
+	G1       []rune
+	Charset  int
+	Origin   bool
+	Wrap     bool
+	SavedCol *int
+}
+
+type Screen struct {
+	Columns           int
+	Lines             int
+	Buffer            [][]Cell
+	Dirty             map[int]struct{}
+	Cursor            Cursor
+	Mode              map[int]struct{}
+	Margins           *Margins
+	Charset           int
+	G0                []rune
+	G1                []rune
+	TabStops          map[int]struct{}
+	Title             string
+	IconName          string
+	Savepoints        []Savepoint
+	SavedColumns      *int
+	WriteProcessInput func(string)
 }
 
 func NewScreen(cols, lines int) *Screen {
 	s := &Screen{}
-	s.Resize(cols, lines)
+	s.Resize(lines, cols)
+	s.Reset()
 	return s
 }
 
-func (s *Screen) Resize(cols, lines int) {
-	if cols <= 0 {
-		cols = 1
+func (s *Screen) Reset() {
+	s.Dirty = make(map[int]struct{})
+	s.markDirtyRange(0, s.Lines-1)
+	s.Buffer = makeBlankCells(s.Lines, s.Columns)
+	s.Margins = nil
+	s.Mode = map[int]struct{}{
+		ModeDECAWM:  {},
+		ModeDECTCEM: {},
 	}
+	s.Title = ""
+	s.IconName = ""
+	s.Charset = 0
+	s.G0 = charsetLat1
+	s.G1 = charsetVT100
+	s.TabStops = make(map[int]struct{})
+	for col := 8; col < s.Columns; col += 8 {
+		s.TabStops[col] = struct{}{}
+	}
+	s.Cursor = Cursor{Row: 0, Col: 0, Attr: s.defaultAttr(), Hidden: false}
+	s.Savepoints = nil
+	s.SavedColumns = nil
+	if s.WriteProcessInput == nil {
+		s.WriteProcessInput = func(string) {}
+	}
+}
+
+func (s *Screen) Resize(lines, columns int) {
 	if lines <= 0 {
 		lines = 1
 	}
-	s.cols = cols
-	s.lines = lines
-	s.cells = make([][]Cell, lines)
-	for row := 0; row < lines; row++ {
-		s.cells[row] = make([]Cell, cols)
-		for col := 0; col < cols; col++ {
-			s.cells[row][col] = defaultCell()
+	if columns <= 0 {
+		columns = 1
+	}
+	if s.Lines == lines && s.Columns == columns && s.Buffer != nil {
+		return
+	}
+	if s.Buffer == nil {
+		s.Lines = lines
+		s.Columns = columns
+		s.Buffer = makeBlankCells(lines, columns)
+		return
+	}
+
+	s.markDirtyRange(0, lines-1)
+
+	if lines < s.Lines {
+		s.SaveCursor()
+		s.CursorPosition(0, 0)
+		s.DeleteLines(s.Lines - lines)
+		s.RestoreCursor()
+	}
+
+	if columns < s.Columns {
+		for row := range s.Buffer {
+			if len(s.Buffer[row]) > columns {
+				s.Buffer[row] = s.Buffer[row][:columns]
+			}
 		}
 	}
-	s.resetState()
-}
 
-func (s *Screen) Reset() {
-	for row := 0; row < s.lines; row++ {
-		for col := 0; col < s.cols; col++ {
-			s.cells[row][col] = defaultCell()
+	if columns > s.Columns {
+		for row := range s.Buffer {
+			if len(s.Buffer[row]) < columns {
+				missing := make([]Cell, columns-len(s.Buffer[row]))
+				for i := range missing {
+					missing[i] = s.defaultCell()
+				}
+				s.Buffer[row] = append(s.Buffer[row], missing...)
+			}
 		}
 	}
-	s.resetState()
-}
 
-func (s *Screen) resetState() {
-	s.cursor = Cursor{}
-	s.savedCursor = Cursor{}
-	s.attr = Attr{}
-	s.insertMode = false
-	s.originMode = false
-	s.autowrap = true
-	s.newlineMode = false
-	s.wrapPending = false
-	s.scrollTop = 0
-	s.scrollBottom = s.lines - 1
-	s.tabStops = make(map[int]struct{})
-	for col := 0; col < s.cols; col += 8 {
-		s.tabStops[col] = struct{}{}
+	if lines > s.Lines {
+		for i := 0; i < lines-s.Lines; i++ {
+			s.Buffer = append(s.Buffer, blankLine(columns, s.defaultCell()))
+		}
 	}
+
+	s.Lines = lines
+	s.Columns = columns
+	s.SetMargins(0, 0)
 }
 
 func (s *Screen) Display() []string {
-	lines := make([]string, s.lines)
-	for row := 0; row < s.lines; row++ {
+	lines := make([]string, s.Lines)
+	for row := 0; row < s.Lines; row++ {
 		var b strings.Builder
-		b.Grow(s.cols)
-		for col := 0; col < s.cols; col++ {
-			b.WriteRune(s.cells[row][col].Ch)
+		col := 0
+		for col < s.Columns {
+			cell := s.Buffer[row][col]
+			if cell.Data == "" {
+				col++
+				continue
+			}
+			width := runewidth.StringWidth(cell.Data)
+			if width == 0 {
+				b.WriteString(cell.Data)
+				col++
+				continue
+			}
+			b.WriteString(cell.Data)
+			if width > 1 {
+				col += width
+			} else {
+				col++
+			}
 		}
 		lines[row] = b.String()
 	}
 	return lines
 }
 
-func (s *Screen) Lines() [][]Cell {
-	lines := make([][]Cell, s.lines)
-	for row := range s.cells {
-		lines[row] = append([]Cell(nil), s.cells[row]...)
+func (s *Screen) LinesCells() [][]Cell {
+	lines := make([][]Cell, s.Lines)
+	for row := range s.Buffer {
+		lines[row] = append([]Cell(nil), s.Buffer[row]...)
 	}
 	return lines
 }
 
-func (s *Screen) Cursor() Cursor {
-	return s.cursor
-}
+func (s *Screen) Draw(data string) {
+	data = s.translate(data)
+	graphemes := uniseg.NewGraphemes(data)
+	for graphemes.Next() {
+		cluster := graphemes.Str()
+		width := runewidth.StringWidth(cluster)
 
-func (s *Screen) Size() (int, int) {
-	return s.cols, s.lines
-}
-
-func (s *Screen) EnableAlternateBuffer(clear bool) {
-	if s.usingAlt {
-		if clear {
-			s.clearAll()
-		}
-		return
-	}
-	s.primary = s.snapshot()
-	s.usingAlt = true
-	s.cells = makeBlankCells(s.lines, s.cols)
-	s.resetState()
-	if clear {
-		s.clearAll()
-	}
-}
-
-func (s *Screen) DisableAlternateBuffer() {
-	if !s.usingAlt {
-		return
-	}
-	s.restore(s.primary)
-	s.usingAlt = false
-}
-
-func (s *Screen) SetTabStop(col int) {
-	if col < 0 || col >= s.cols {
-		return
-	}
-	s.tabStops[col] = struct{}{}
-}
-
-func (s *Screen) ClearTabStop(col int) {
-	delete(s.tabStops, col)
-}
-
-func (s *Screen) ClearAllTabStops() {
-	s.tabStops = make(map[int]struct{})
-}
-
-func (s *Screen) SetInsertMode(enabled bool) {
-	s.insertMode = enabled
-}
-
-func (s *Screen) SetAutowrap(enabled bool) {
-	s.autowrap = enabled
-}
-
-func (s *Screen) SetOriginMode(enabled bool) {
-	s.originMode = enabled
-	if enabled {
-		s.cursor.Row = s.scrollTop
-		s.cursor.Col = 0
-	} else {
-		s.cursor.Row = 0
-		s.cursor.Col = 0
-	}
-	s.wrapPending = false
-}
-
-func (s *Screen) SetNewlineMode(enabled bool) {
-	s.newlineMode = enabled
-}
-
-func (s *Screen) SaveCursor() {
-	s.savedCursor = s.cursor
-}
-
-func (s *Screen) RestoreCursor() {
-	s.cursor = s.savedCursor
-	s.wrapPending = false
-}
-
-func (s *Screen) PutRune(ch rune) {
-	if s.wrapPending {
-		s.LineFeed()
-		s.cursor.Col = 0
-		s.wrapPending = false
-	}
-	if s.cursor.Row < 0 || s.cursor.Row >= s.lines || s.cursor.Col < 0 || s.cursor.Col >= s.cols {
-		return
-	}
-	if s.insertMode {
-		for col := s.cols - 1; col > s.cursor.Col; col-- {
-			s.cells[s.cursor.Row][col] = s.cells[s.cursor.Row][col-1]
-		}
-		s.cells[s.cursor.Row][s.cursor.Col] = defaultCell()
-	}
-	s.cells[s.cursor.Row][s.cursor.Col] = Cell{Ch: ch, Attr: s.attr}
-	if s.autowrap && s.cursor.Col == s.cols-1 {
-		s.wrapPending = true
-		return
-	}
-	s.cursor.Col++
-	if s.cursor.Col >= s.cols {
-		s.cursor.Col = s.cols - 1
-	}
-}
-
-func (s *Screen) Backspace() {
-	if s.cursor.Col > 0 {
-		s.cursor.Col--
-	}
-	s.wrapPending = false
-}
-
-func (s *Screen) Tab() {
-	next := s.cols - 1
-	for col := s.cursor.Col + 1; col < s.cols; col++ {
-		if _, ok := s.tabStops[col]; ok {
-			next = col
-			break
-		}
-	}
-	s.cursor.Col = next
-	s.wrapPending = false
-}
-
-func (s *Screen) LineFeed() {
-	if s.newlineMode {
-		s.cursor.Col = 0
-	}
-	if s.cursor.Row == s.scrollBottom {
-		s.ScrollUp(1)
-	} else if s.cursor.Row < s.lines-1 {
-		s.cursor.Row++
-	}
-	s.wrapPending = false
-}
-
-func (s *Screen) CarriageReturn() {
-	s.cursor.Col = 0
-	s.wrapPending = false
-}
-
-func (s *Screen) MoveCursor(rowDelta, colDelta int) {
-	row := s.cursor.Row + rowDelta
-	col := s.cursor.Col + colDelta
-	if s.originMode {
-		row = s.clampRowInRegion(row)
-	} else {
-		row = s.clampRow(row)
-	}
-	col = s.clampCol(col)
-	s.cursor.Row = row
-	s.cursor.Col = col
-	s.wrapPending = false
-}
-
-func (s *Screen) SetCursor(row, col int) {
-	if s.originMode {
-		row += s.scrollTop
-		row = s.clampRowInRegion(row)
-	} else {
-		row = s.clampRow(row)
-	}
-	col = s.clampCol(col)
-	s.cursor.Row = row
-	s.cursor.Col = col
-	s.wrapPending = false
-}
-
-func (s *Screen) SetScrollRegion(top, bottom int) {
-	if top < 0 || bottom >= s.lines || top >= bottom {
-		s.scrollTop = 0
-		s.scrollBottom = s.lines - 1
-	} else {
-		s.scrollTop = top
-		s.scrollBottom = bottom
-	}
-	s.cursor.Row = s.scrollTop
-	s.cursor.Col = 0
-	s.wrapPending = false
-}
-
-func (s *Screen) ScrollUp(n int) {
-	if n <= 0 {
-		return
-	}
-	if n > s.scrollBottom-s.scrollTop+1 {
-		n = s.scrollBottom - s.scrollTop + 1
-	}
-	for i := 0; i < n; i++ {
-		for row := s.scrollTop; row < s.scrollBottom; row++ {
-			s.cells[row] = s.cells[row+1]
-		}
-		s.cells[s.scrollBottom] = blankLine(s.cols)
-	}
-}
-
-func (s *Screen) ScrollDown(n int) {
-	if n <= 0 {
-		return
-	}
-	if n > s.scrollBottom-s.scrollTop+1 {
-		n = s.scrollBottom - s.scrollTop + 1
-	}
-	for i := 0; i < n; i++ {
-		for row := s.scrollBottom; row > s.scrollTop; row-- {
-			s.cells[row] = s.cells[row-1]
-		}
-		s.cells[s.scrollTop] = blankLine(s.cols)
-	}
-}
-
-func (s *Screen) EraseInDisplay(mode int) {
-	switch mode {
-	case 0:
-		s.EraseInLine(0)
-		for row := s.cursor.Row + 1; row < s.lines; row++ {
-			s.clearLine(row)
-		}
-	case 1:
-		s.EraseInLine(1)
-		for row := 0; row < s.cursor.Row; row++ {
-			s.clearLine(row)
-		}
-	case 2:
-		for row := 0; row < s.lines; row++ {
-			s.clearLine(row)
-		}
-	}
-}
-
-func (s *Screen) EraseInLine(mode int) {
-	row := s.cursor.Row
-	if row < 0 || row >= s.lines {
-		return
-	}
-	switch mode {
-	case 0:
-		for col := s.cursor.Col; col < s.cols; col++ {
-			s.cells[row][col] = defaultCell()
-		}
-	case 1:
-		for col := 0; col <= s.cursor.Col && col < s.cols; col++ {
-			s.cells[row][col] = defaultCell()
-		}
-	case 2:
-		s.clearLine(row)
-	}
-}
-
-func (s *Screen) EraseChars(n int) {
-	if n <= 0 {
-		n = 1
-	}
-	row := s.cursor.Row
-	if row < 0 || row >= s.lines {
-		return
-	}
-	for col := s.cursor.Col; col < s.cols && n > 0; col++ {
-		s.cells[row][col] = defaultCell()
-		n--
-	}
-}
-
-func (s *Screen) DeleteChars(n int) {
-	if n <= 0 {
-		n = 1
-	}
-	row := s.cursor.Row
-	if row < 0 || row >= s.lines {
-		return
-	}
-	if n > s.cols-s.cursor.Col {
-		n = s.cols - s.cursor.Col
-	}
-	for col := s.cursor.Col; col < s.cols-n; col++ {
-		s.cells[row][col] = s.cells[row][col+n]
-	}
-	for col := s.cols - n; col < s.cols; col++ {
-		s.cells[row][col] = defaultCell()
-	}
-}
-
-func (s *Screen) InsertChars(n int) {
-	if n <= 0 {
-		n = 1
-	}
-	row := s.cursor.Row
-	if row < 0 || row >= s.lines {
-		return
-	}
-	if n > s.cols-s.cursor.Col {
-		n = s.cols - s.cursor.Col
-	}
-	for col := s.cols - 1; col >= s.cursor.Col+n; col-- {
-		s.cells[row][col] = s.cells[row][col-n]
-	}
-	for col := s.cursor.Col; col < s.cursor.Col+n; col++ {
-		s.cells[row][col] = defaultCell()
-	}
-}
-
-func (s *Screen) DeleteLines(n int) {
-	if n <= 0 {
-		n = 1
-	}
-	if s.cursor.Row < s.scrollTop || s.cursor.Row > s.scrollBottom {
-		return
-	}
-	max := s.scrollBottom - s.cursor.Row + 1
-	if n > max {
-		n = max
-	}
-	for i := 0; i < n; i++ {
-		for row := s.cursor.Row; row < s.scrollBottom; row++ {
-			s.cells[row] = s.cells[row+1]
-		}
-		s.cells[s.scrollBottom] = blankLine(s.cols)
-	}
-}
-
-func (s *Screen) InsertLines(n int) {
-	if n <= 0 {
-		n = 1
-	}
-	if s.cursor.Row < s.scrollTop || s.cursor.Row > s.scrollBottom {
-		return
-	}
-	max := s.scrollBottom - s.cursor.Row + 1
-	if n > max {
-		n = max
-	}
-	for i := 0; i < n; i++ {
-		for row := s.scrollBottom; row > s.cursor.Row; row-- {
-			s.cells[row] = s.cells[row-1]
-		}
-		s.cells[s.cursor.Row] = blankLine(s.cols)
-	}
-}
-
-func (s *Screen) ApplySGR(params []int) {
-	if len(params) == 0 {
-		params = []int{0}
-	}
-	for i := 0; i < len(params); i++ {
-		p := params[i]
-		switch {
-		case p == 0:
-			s.attr = Attr{}
-		case p == 1:
-			s.attr.Bold = true
-		case p == 4:
-			s.attr.Underline = true
-		case p == 5:
-			s.attr.Blink = true
-		case p == 7:
-			s.attr.Reverse = true
-		case p == 8:
-			s.attr.Conceal = true
-		case p == 22:
-			s.attr.Bold = false
-		case p == 24:
-			s.attr.Underline = false
-		case p == 25:
-			s.attr.Blink = false
-		case p == 27:
-			s.attr.Reverse = false
-		case p == 28:
-			s.attr.Conceal = false
-		case p == 39:
-			s.attr.Fg = Color{}
-		case p == 49:
-			s.attr.Bg = Color{}
-		case p >= 30 && p <= 37:
-			s.attr.Fg = Color{Mode: ColorANSI16, Index: uint8(p - 30)}
-		case p >= 90 && p <= 97:
-			s.attr.Fg = Color{Mode: ColorANSI16, Index: uint8(p - 90 + 8)}
-		case p >= 40 && p <= 47:
-			s.attr.Bg = Color{Mode: ColorANSI16, Index: uint8(p - 40)}
-		case p >= 100 && p <= 107:
-			s.attr.Bg = Color{Mode: ColorANSI16, Index: uint8(p - 100 + 8)}
-		case p == 38 || p == 48:
-			if i+2 < len(params) && params[i+1] == 5 {
-				index := params[i+2]
-				if index >= 0 && index <= 255 {
-					color := Color{Mode: ColorANSI256, Index: uint8(index)}
-					if p == 38 {
-						s.attr.Fg = color
-					} else {
-						s.attr.Bg = color
-					}
+		if s.Cursor.Col == s.Columns {
+			if s.isModeSet(ModeDECAWM) {
+				s.Dirty[s.Cursor.Row] = struct{}{}
+				s.CarriageReturn()
+				s.LineFeed()
+			} else if width > 0 {
+				s.Cursor.Col -= width
+				if s.Cursor.Col < 0 {
+					s.Cursor.Col = 0
 				}
-				i += 2
+			}
+		}
+
+		if s.isModeSet(ModeIRM) && width > 0 {
+			s.InsertCharacters(width)
+		}
+
+		line := s.Buffer[s.Cursor.Row]
+		switch {
+		case width == 1:
+			line[s.Cursor.Col] = Cell{Data: cluster, Attr: s.Cursor.Attr}
+		case width == 2:
+			line[s.Cursor.Col] = Cell{Data: cluster, Attr: s.Cursor.Attr}
+			if s.Cursor.Col+1 < s.Columns {
+				line[s.Cursor.Col+1] = Cell{Data: "", Attr: s.Cursor.Attr}
+			}
+		case width == 0 && isCombiningCluster(cluster):
+			if s.Cursor.Col > 0 {
+				prev := line[s.Cursor.Col-1]
+				line[s.Cursor.Col-1] = Cell{Data: norm.NFC.String(prev.Data + cluster), Attr: prev.Attr}
+			} else if s.Cursor.Row > 0 {
+				prevLine := s.Buffer[s.Cursor.Row-1]
+				prev := prevLine[s.Columns-1]
+				prevLine[s.Columns-1] = Cell{Data: norm.NFC.String(prev.Data + cluster), Attr: prev.Attr}
+			}
+		default:
+			continue
+		}
+
+		if width > 0 {
+			s.Cursor.Col += width
+			if s.Cursor.Col > s.Columns {
+				s.Cursor.Col = s.Columns
 			}
 		}
 	}
+	s.Dirty[s.Cursor.Row] = struct{}{}
 }
 
-func (s *Screen) snapshot() bufferState {
-	return bufferState{
-		cells:        cloneCells(s.cells),
-		cursor:       s.cursor,
-		savedCursor:  s.savedCursor,
-		attr:         s.attr,
-		insertMode:   s.insertMode,
-		originMode:   s.originMode,
-		autowrap:     s.autowrap,
-		newlineMode:  s.newlineMode,
-		wrapPending:  s.wrapPending,
-		scrollTop:    s.scrollTop,
-		scrollBottom: s.scrollBottom,
-		tabStops:     cloneTabStops(s.tabStops),
+func (s *Screen) SetTitle(param string) {
+	s.Title = param
+}
+
+func (s *Screen) SetIconName(param string) {
+	s.IconName = param
+}
+
+func (s *Screen) CarriageReturn() {
+	s.Cursor.Col = 0
+}
+
+func (s *Screen) Index() {
+	top, bottom := s.scrollRegion()
+	if s.Cursor.Row == bottom {
+		s.markDirtyRange(0, s.Lines-1)
+		for row := top; row < bottom; row++ {
+			s.Buffer[row] = s.Buffer[row+1]
+		}
+		s.Buffer[bottom] = blankLine(s.Columns, s.defaultCell())
+	} else {
+		s.CursorDown(1)
 	}
 }
 
-func (s *Screen) restore(state bufferState) {
-	s.cells = cloneCells(state.cells)
-	s.cursor = state.cursor
-	s.savedCursor = state.savedCursor
-	s.attr = state.attr
-	s.insertMode = state.insertMode
-	s.originMode = state.originMode
-	s.autowrap = state.autowrap
-	s.newlineMode = state.newlineMode
-	s.wrapPending = state.wrapPending
-	s.scrollTop = state.scrollTop
-	s.scrollBottom = state.scrollBottom
-	s.tabStops = cloneTabStops(state.tabStops)
+func (s *Screen) ReverseIndex() {
+	top, bottom := s.scrollRegion()
+	if s.Cursor.Row == top {
+		s.markDirtyRange(0, s.Lines-1)
+		for row := bottom; row > top; row-- {
+			s.Buffer[row] = s.Buffer[row-1]
+		}
+		s.Buffer[top] = blankLine(s.Columns, s.defaultCell())
+	} else {
+		s.CursorUp(1)
+	}
 }
 
-func (s *Screen) clearAll() {
-	for row := 0; row < s.lines; row++ {
-		for col := 0; col < s.cols; col++ {
-			s.cells[row][col] = defaultCell()
+func (s *Screen) LineFeed() {
+	s.Index()
+	if s.isModeSet(ModeLNM) {
+		s.CarriageReturn()
+	}
+}
+
+func (s *Screen) Tab() {
+	column := s.Columns - 1
+	for _, stop := range sortedStops(s.TabStops) {
+		if s.Cursor.Col < stop {
+			column = stop
+			break
+		}
+	}
+	s.Cursor.Col = column
+}
+
+func (s *Screen) Backspace() {
+	s.CursorBack(1)
+}
+
+func (s *Screen) SaveCursor() {
+	modeOrigin := s.isModeSet(ModeDECOM)
+	modeWrap := s.isModeSet(ModeDECAWM)
+	s.Savepoints = append(s.Savepoints, Savepoint{
+		Cursor:   s.Cursor,
+		G0:       s.G0,
+		G1:       s.G1,
+		Charset:  s.Charset,
+		Origin:   modeOrigin,
+		Wrap:     modeWrap,
+		SavedCol: s.SavedColumns,
+	})
+}
+
+func (s *Screen) RestoreCursor() {
+	if len(s.Savepoints) == 0 {
+		s.ResetMode([]int{ModeDECOM}, false)
+		s.CursorPosition(0, 0)
+		return
+	}
+
+	last := s.Savepoints[len(s.Savepoints)-1]
+	s.Savepoints = s.Savepoints[:len(s.Savepoints)-1]
+	s.G0 = last.G0
+	s.G1 = last.G1
+	s.Charset = last.Charset
+	if last.Origin {
+		s.SetMode([]int{ModeDECOM}, false)
+	} else {
+		s.ResetMode([]int{ModeDECOM}, false)
+	}
+	if last.Wrap {
+		s.SetMode([]int{ModeDECAWM}, false)
+	} else {
+		s.ResetMode([]int{ModeDECAWM}, false)
+	}
+	s.Cursor = last.Cursor
+	s.ensureHB()
+	s.ensureVB(true)
+}
+
+func (s *Screen) InsertLines(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	if s.Cursor.Row < top || s.Cursor.Row > bottom {
+		return
+	}
+	s.markDirtyRange(s.Cursor.Row, s.Lines-1)
+	for row := bottom; row >= s.Cursor.Row; row-- {
+		if row+count <= bottom {
+			s.Buffer[row+count] = s.Buffer[row]
+		}
+		s.Buffer[row] = blankLine(s.Columns, s.defaultCell())
+	}
+	s.CarriageReturn()
+}
+
+func (s *Screen) DeleteLines(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	if s.Cursor.Row < top || s.Cursor.Row > bottom {
+		return
+	}
+	s.markDirtyRange(s.Cursor.Row, s.Lines-1)
+	for row := s.Cursor.Row; row <= bottom; row++ {
+		if row+count <= bottom {
+			s.Buffer[row] = s.Buffer[row+count]
+		} else {
+			s.Buffer[row] = blankLine(s.Columns, s.defaultCell())
+		}
+	}
+	s.CarriageReturn()
+}
+
+func (s *Screen) InsertCharacters(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	s.Dirty[s.Cursor.Row] = struct{}{}
+	line := s.Buffer[s.Cursor.Row]
+	for col := s.Columns - 1; col >= s.Cursor.Col; col-- {
+		if col+count < s.Columns {
+			line[col+count] = line[col]
+		}
+	}
+	for col := s.Cursor.Col; col < s.Cursor.Col+count && col < s.Columns; col++ {
+		line[col] = s.defaultCell()
+	}
+}
+
+func (s *Screen) DeleteCharacters(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	s.Dirty[s.Cursor.Row] = struct{}{}
+	line := s.Buffer[s.Cursor.Row]
+	for col := s.Cursor.Col; col < s.Columns; col++ {
+		if col+count < s.Columns {
+			line[col] = line[col+count]
+		} else {
+			line[col] = s.defaultCell()
 		}
 	}
 }
 
-func (s *Screen) clampRow(row int) int {
-	if row < 0 {
-		return 0
+func (s *Screen) EraseCharacters(count int) {
+	if count <= 0 {
+		count = 1
 	}
-	if row >= s.lines {
-		return s.lines - 1
+	s.Dirty[s.Cursor.Row] = struct{}{}
+	line := s.Buffer[s.Cursor.Row]
+	for col := s.Cursor.Col; col < s.Columns && col < s.Cursor.Col+count; col++ {
+		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
 	}
-	return row
 }
 
-func (s *Screen) clampRowInRegion(row int) int {
-	if row < s.scrollTop {
-		return s.scrollTop
-	}
-	if row > s.scrollBottom {
-		return s.scrollBottom
-	}
-	return row
-}
-
-func (s *Screen) clampCol(col int) int {
-	if col < 0 {
-		return 0
-	}
-	if col >= s.cols {
-		return s.cols - 1
-	}
-	return col
-}
-
-func (s *Screen) clearLine(row int) {
-	if row < 0 || row >= s.lines {
+func (s *Screen) EraseInLine(how int, private bool) {
+	if private {
 		return
 	}
-	for col := 0; col < s.cols; col++ {
-		s.cells[row][col] = defaultCell()
+	s.Dirty[s.Cursor.Row] = struct{}{}
+	line := s.Buffer[s.Cursor.Row]
+	var start, end int
+	switch how {
+	case 0:
+		start = s.Cursor.Col
+		end = s.Columns
+	case 1:
+		start = 0
+		end = s.Cursor.Col + 1
+	case 2:
+		start = 0
+		end = s.Columns
+	}
+	for col := start; col < end; col++ {
+		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
 	}
 }
 
-func blankLine(cols int) []Cell {
+func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
+	if private {
+		return
+	}
+	var start, end int
+	switch how {
+	case 0:
+		start = s.Cursor.Row + 1
+		end = s.Lines
+	case 1:
+		start = 0
+		end = s.Cursor.Row
+	case 2, 3:
+		start = 0
+		end = s.Lines
+	}
+	if how == 0 || how == 1 {
+		s.EraseInLine(how, false)
+	}
+	for row := start; row < end; row++ {
+		line := s.Buffer[row]
+		for col := 0; col < s.Columns; col++ {
+			line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
+		}
+		s.Dirty[row] = struct{}{}
+	}
+	if how == 2 || how == 3 {
+		s.markDirtyRange(0, s.Lines-1)
+	}
+}
+
+func (s *Screen) SetTabStop() {
+	s.TabStops[s.Cursor.Col] = struct{}{}
+}
+
+func (s *Screen) ClearTabStop(how int) {
+	switch how {
+	case 0:
+		delete(s.TabStops, s.Cursor.Col)
+	case 3:
+		s.TabStops = make(map[int]struct{})
+	}
+}
+
+func (s *Screen) EnsureCursor() {
+	s.ensureHB()
+	s.ensureVB(false)
+}
+
+func (s *Screen) CursorUp(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, _ := s.scrollRegion()
+	s.Cursor.Row = maxInt(s.Cursor.Row-count, top)
+}
+
+func (s *Screen) CursorUp1(count int) {
+	s.CursorUp(count)
+	s.CarriageReturn()
+}
+
+func (s *Screen) CursorDown(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	_, bottom := s.scrollRegion()
+	s.Cursor.Row = minInt(s.Cursor.Row+count, bottom)
+}
+
+func (s *Screen) CursorDown1(count int) {
+	s.CursorDown(count)
+	s.CarriageReturn()
+}
+
+func (s *Screen) CursorBack(count int) {
+	if s.Cursor.Col == s.Columns {
+		s.Cursor.Col--
+	}
+	if count <= 0 {
+		count = 1
+	}
+	s.Cursor.Col -= count
+	s.ensureHB()
+}
+
+func (s *Screen) CursorForward(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	s.Cursor.Col += count
+	s.ensureHB()
+}
+
+func (s *Screen) CursorPosition(line, column int) {
+	if column <= 0 {
+		column = 1
+	}
+	if line <= 0 {
+		line = 1
+	}
+	row := line - 1
+	col := column - 1
+	if s.Margins != nil && s.isModeSet(ModeDECOM) {
+		row += s.Margins.Top
+		if row < s.Margins.Top || row > s.Margins.Bottom {
+			return
+		}
+	}
+	s.Cursor.Row = row
+	s.Cursor.Col = col
+	s.ensureHB()
+	s.ensureVB(false)
+}
+
+func (s *Screen) CursorToColumn(column int) {
+	if column <= 0 {
+		column = 1
+	}
+	s.Cursor.Col = column - 1
+	s.ensureHB()
+}
+
+func (s *Screen) CursorToLine(line int) {
+	if line <= 0 {
+		line = 1
+	}
+	row := line - 1
+	if s.isModeSet(ModeDECOM) && s.Margins != nil {
+		row += s.Margins.Top
+	}
+	s.Cursor.Row = row
+	s.ensureVB(false)
+}
+
+func (s *Screen) Bell() {
+}
+
+func (s *Screen) AlignmentDisplay() {
+	s.markDirtyRange(0, s.Lines-1)
+	for row := 0; row < s.Lines; row++ {
+		for col := 0; col < s.Columns; col++ {
+			cell := s.Buffer[row][col]
+			cell.Data = "E"
+			s.Buffer[row][col] = cell
+		}
+	}
+}
+
+func (s *Screen) SelectGraphicRendition(attrs []int, private bool) {
+	if private {
+		return
+	}
+	if len(attrs) == 0 || (len(attrs) == 1 && attrs[0] == 0) {
+		s.Cursor.Attr = s.defaultAttr()
+		return
+	}
+
+	replace := s.Cursor.Attr
+	queue := append([]int(nil), attrs...)
+
+	for len(queue) > 0 {
+		attr := queue[0]
+		queue = queue[1:]
+		switch {
+		case attr == 0:
+			replace = s.defaultAttr()
+		case fgANSI[attr] != "":
+			replace.Fg = colorFromName(fgANSI[attr], ColorANSI16, uint8(attr-30))
+		case bgANSI[attr] != "":
+			replace.Bg = colorFromName(bgANSI[attr], ColorANSI16, uint8(attr-40))
+		case fgAixterm[attr] != "":
+			replace.Fg = colorFromName(fgAixterm[attr], ColorANSI16, uint8(attr-90+8))
+		case bgAixterm[attr] != "":
+			replace.Bg = colorFromName(bgAixterm[attr], ColorANSI16, uint8(attr-100+8))
+		case textAttributes[attr] != "":
+			flag := textAttributes[attr]
+			switch flag {
+			case "+bold":
+				replace.Bold = true
+			case "-bold":
+				replace.Bold = false
+			case "+italics":
+				replace.Italics = true
+			case "-italics":
+				replace.Italics = false
+			case "+underline":
+				replace.Underline = true
+			case "-underline":
+				replace.Underline = false
+			case "+blink":
+				replace.Blink = true
+			case "-blink":
+				replace.Blink = false
+			case "+reverse":
+				replace.Reverse = true
+			case "-reverse":
+				replace.Reverse = false
+			case "+strikethrough":
+				replace.Strikethrough = true
+			case "-strikethrough":
+				replace.Strikethrough = false
+			}
+		case attr == SgrFg256 || attr == SgrBg256:
+			keyIsFg := attr == SgrFg256
+			if len(queue) < 1 {
+				break
+			}
+			mode := queue[0]
+			queue = queue[1:]
+			switch mode {
+			case 5:
+				if len(queue) < 1 {
+					break
+				}
+				index := queue[0]
+				queue = queue[1:]
+				if index >= 0 && index < len(fgBg256) {
+					color := Color{Mode: ColorANSI256, Index: uint8(index), Name: fgBg256[index]}
+					if keyIsFg {
+						replace.Fg = color
+					} else {
+						replace.Bg = color
+					}
+				}
+			case 2:
+				if len(queue) < 3 {
+					break
+				}
+				r := queue[0]
+				g := queue[1]
+				b := queue[2]
+				queue = queue[3:]
+				color := Color{Mode: ColorTrueColor, Name: rgbHex(r, g, b)}
+				if keyIsFg {
+					replace.Fg = color
+				} else {
+					replace.Bg = color
+				}
+			}
+		}
+	}
+	s.Cursor.Attr = replace
+}
+
+func (s *Screen) ReportDeviceAttributes(mode int, private bool) {
+	if mode == 0 && !private {
+		s.WriteProcessInput(ControlCSI + "?6c")
+	}
+}
+
+func (s *Screen) ReportDeviceStatus(mode int) {
+	switch mode {
+	case 5:
+		s.WriteProcessInput(ControlCSI + "0n")
+	case 6:
+		x := s.Cursor.Col + 1
+		y := s.Cursor.Row + 1
+		if s.isModeSet(ModeDECOM) && s.Margins != nil {
+			y -= s.Margins.Top
+		}
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf("%d;%dR", y, x))
+	}
+}
+
+func (s *Screen) Debug(_ ...interface{}) {
+}
+
+func (s *Screen) DefineCharset(code, mode string) {
+	mapping, ok := charsetMaps[code]
+	if !ok {
+		return
+	}
+	if mode == "(" {
+		s.G0 = mapping
+	} else if mode == ")" {
+		s.G1 = mapping
+	}
+}
+
+func (s *Screen) ShiftIn() {
+	s.Charset = 0
+}
+
+func (s *Screen) ShiftOut() {
+	s.Charset = 1
+}
+
+func (s *Screen) SetMargins(top, bottom int) {
+	if (top == 0 || top == -1) && bottom == 0 {
+		s.Margins = nil
+		return
+	}
+	margins := s.Margins
+	if margins == nil {
+		margins = &Margins{Top: 0, Bottom: s.Lines - 1}
+	}
+	if top == 0 {
+		top = margins.Top + 1
+	}
+	if bottom == 0 {
+		bottom = margins.Bottom + 1
+	}
+
+	top = maxInt(0, minInt(top-1, s.Lines-1))
+	bottom = maxInt(0, minInt(bottom-1, s.Lines-1))
+
+	if bottom-top >= 1 {
+		s.Margins = &Margins{Top: top, Bottom: bottom}
+		s.CursorPosition(0, 0)
+	}
+}
+
+func (s *Screen) SetMode(modes []int, private bool) {
+	for _, mode := range modes {
+		s.applySetMode(mode, private)
+	}
+}
+
+func (s *Screen) ResetMode(modes []int, private bool) {
+	for _, mode := range modes {
+		s.applyResetMode(mode, private)
+	}
+}
+
+func (s *Screen) applySetMode(mode int, private bool) {
+	if private {
+		mode = mode << 5
+	}
+	if s.Mode == nil {
+		s.Mode = make(map[int]struct{})
+	}
+	s.Mode[mode] = struct{}{}
+
+	if mode == ModeDECCOLM {
+		saved := s.Columns
+		s.SavedColumns = &saved
+		s.Resize(s.Lines, 132)
+		s.EraseInDisplay(2, false)
+		s.CursorPosition(0, 0)
+	}
+
+	if mode == ModeDECOM {
+		s.CursorPosition(0, 0)
+	}
+
+	if mode == ModeDECSCNM {
+		s.markDirtyRange(0, s.Lines-1)
+		for row := 0; row < s.Lines; row++ {
+			for col := 0; col < s.Columns; col++ {
+				cell := s.Buffer[row][col]
+				cell.Attr.Reverse = true
+				s.Buffer[row][col] = cell
+			}
+		}
+		s.SelectGraphicRendition([]int{7}, false)
+	}
+
+	if mode == ModeDECTCEM {
+		s.Cursor.Hidden = false
+	}
+}
+
+func (s *Screen) applyResetMode(mode int, private bool) {
+	if private {
+		mode = mode << 5
+	}
+	delete(s.Mode, mode)
+
+	if mode == ModeDECCOLM {
+		if s.Columns == 132 && s.SavedColumns != nil {
+			s.Resize(s.Lines, *s.SavedColumns)
+			s.SavedColumns = nil
+		}
+		s.EraseInDisplay(2, false)
+		s.CursorPosition(0, 0)
+	}
+
+	if mode == ModeDECOM {
+		s.CursorPosition(0, 0)
+	}
+
+	if mode == ModeDECSCNM {
+		s.markDirtyRange(0, s.Lines-1)
+		for row := 0; row < s.Lines; row++ {
+			for col := 0; col < s.Columns; col++ {
+				cell := s.Buffer[row][col]
+				cell.Attr.Reverse = false
+				s.Buffer[row][col] = cell
+			}
+		}
+		s.SelectGraphicRendition([]int{27}, false)
+	}
+
+	if mode == ModeDECTCEM {
+		s.Cursor.Hidden = true
+	}
+}
+
+func (s *Screen) defaultAttr() Attr {
+	reverse := s.isModeSet(ModeDECSCNM)
+	return Attr{
+		Fg:      Color{Name: "default", Mode: ColorDefault},
+		Bg:      Color{Name: "default", Mode: ColorDefault},
+		Reverse: reverse,
+	}
+}
+
+func (s *Screen) defaultCell() Cell {
+	return Cell{Data: " ", Attr: s.defaultAttr()}
+}
+
+func (s *Screen) scrollRegion() (int, int) {
+	if s.Margins != nil {
+		return s.Margins.Top, s.Margins.Bottom
+	}
+	return 0, s.Lines - 1
+}
+
+func (s *Screen) ensureHB() {
+	if s.Cursor.Col < 0 {
+		s.Cursor.Col = 0
+	}
+	if s.Cursor.Col >= s.Columns {
+		s.Cursor.Col = s.Columns - 1
+	}
+}
+
+func (s *Screen) ensureVB(useMargins bool) {
+	if (useMargins || s.isModeSet(ModeDECOM)) && s.Margins != nil {
+		if s.Cursor.Row < s.Margins.Top {
+			s.Cursor.Row = s.Margins.Top
+		}
+		if s.Cursor.Row > s.Margins.Bottom {
+			s.Cursor.Row = s.Margins.Bottom
+		}
+		return
+	}
+	if s.Cursor.Row < 0 {
+		s.Cursor.Row = 0
+	}
+	if s.Cursor.Row >= s.Lines {
+		s.Cursor.Row = s.Lines - 1
+	}
+}
+
+func (s *Screen) isModeSet(mode int) bool {
+	_, ok := s.Mode[mode]
+	return ok
+}
+
+func (s *Screen) translate(data string) string {
+	mapping := s.G0
+	if s.Charset == 1 {
+		mapping = s.G1
+	}
+	var b strings.Builder
+	for _, r := range data {
+		if r >= 0 && r < 256 {
+			b.WriteRune(mapping[r])
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func sortedStops(stops map[int]struct{}) []int {
+	values := make([]int, 0, len(stops))
+	for value := range stops {
+		values = append(values, value)
+	}
+	for i := 0; i < len(values)-1; i++ {
+		for j := i + 1; j < len(values); j++ {
+			if values[j] < values[i] {
+				values[i], values[j] = values[j], values[i]
+			}
+		}
+	}
+	return values
+}
+
+func colorFromName(name string, mode ColorMode, index uint8) Color {
+	if name == "default" {
+		return Color{Name: name, Mode: ColorDefault}
+	}
+	return Color{Name: name, Mode: mode, Index: index}
+}
+
+func blankLine(cols int, cell Cell) []Cell {
 	line := make([]Cell, cols)
 	for col := 0; col < cols; col++ {
-		line[col] = defaultCell()
+		line[col] = cell
 	}
 	return line
 }
 
 func makeBlankCells(lines, cols int) [][]Cell {
 	cells := make([][]Cell, lines)
+	cell := Cell{Data: " ", Attr: Attr{Fg: Color{Name: "default", Mode: ColorDefault}, Bg: Color{Name: "default", Mode: ColorDefault}}}
 	for row := 0; row < lines; row++ {
-		cells[row] = blankLine(cols)
+		cells[row] = blankLine(cols, cell)
 	}
 	return cells
 }
 
-func cloneCells(source [][]Cell) [][]Cell {
-	clone := make([][]Cell, len(source))
-	for row := range source {
-		clone[row] = append([]Cell(nil), source[row]...)
+func (s *Screen) markDirtyRange(start, end int) {
+	if start < 0 {
+		start = 0
 	}
-	return clone
+	if end >= s.Lines {
+		end = s.Lines - 1
+	}
+	for row := start; row <= end; row++ {
+		s.Dirty[row] = struct{}{}
+	}
 }
 
-func cloneTabStops(source map[int]struct{}) map[int]struct{} {
-	clone := make(map[int]struct{}, len(source))
-	for key := range source {
-		clone[key] = struct{}{}
+func isCombiningCluster(cluster string) bool {
+	if cluster == "" {
+		return false
 	}
-	return clone
+	for _, r := range cluster {
+		if !unicode.Is(unicode.Mn, r) && !unicode.Is(unicode.Me, r) {
+			return false
+		}
+	}
+	return true
 }
 
-func defaultCell() Cell {
-	return Cell{Ch: ' ', Attr: Attr{}}
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

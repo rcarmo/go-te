@@ -3,38 +3,38 @@ package te
 import "unicode/utf8"
 
 type ByteStream struct {
-	stream   *Stream
-	strict   bool
-	buffer   []byte
-	encoding string
+	*Stream
+	buffer []byte
 }
 
-func NewByteStream(screen ScreenLike, strict bool) *ByteStream {
-	return &ByteStream{
-		stream:   NewStream(screen, strict),
-		strict:   strict,
-		encoding: "UTF-8",
-	}
+func NewByteStream(screen EventHandler, strict bool) *ByteStream {
+	return &ByteStream{Stream: NewStream(screen, strict)}
 }
 
 func (st *ByteStream) Feed(data []byte) error {
-	if len(data) == 0 {
-		return nil
-	}
-	st.buffer = append(st.buffer, data...)
-	for len(st.buffer) > 0 {
-		r, size := utf8.DecodeRune(st.buffer)
-		if r == utf8.RuneError && size == 1 {
-			break
+	if st.useUTF8 {
+		st.buffer = append(st.buffer, data...)
+		var out []rune
+		for len(st.buffer) > 0 {
+			r, size := utf8.DecodeRune(st.buffer)
+			if r == utf8.RuneError && size == 1 {
+				break
+			}
+			st.buffer = st.buffer[size:]
+			out = append(out, r)
 		}
-		st.buffer = st.buffer[size:]
-		if err := st.stream.FeedString(string(r)); err != nil {
-			return err
-		}
+		return st.Stream.Feed(string(out))
 	}
-	return nil
+	out := make([]rune, len(data))
+	for i, b := range data {
+		out[i] = rune(b)
+	}
+	return st.Stream.Feed(string(out))
 }
 
-func (st *ByteStream) SetEncoding(name string) {
-	st.encoding = name
+func (st *ByteStream) SelectOtherCharset(code string) {
+	st.Stream.SelectOtherCharset(code)
+	if st.useUTF8 {
+		st.buffer = nil
+	}
 }
