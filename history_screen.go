@@ -437,6 +437,24 @@ func (h *HistoryScreen) QueryDynamicColor(index int) {
 	h.afterEvent("query_dynamic_color")
 }
 
+func (h *HistoryScreen) SetSpecialColor(index int, value string) {
+	h.beforeEvent("set_special_color")
+	h.Screen.SetSpecialColor(index, value)
+	h.afterEvent("set_special_color")
+}
+
+func (h *HistoryScreen) QuerySpecialColor(index int) {
+	h.beforeEvent("query_special_color")
+	h.Screen.QuerySpecialColor(index)
+	h.afterEvent("query_special_color")
+}
+
+func (h *HistoryScreen) ResetSpecialColor(index int, all bool) {
+	h.beforeEvent("reset_special_color")
+	h.Screen.ResetSpecialColor(index, all)
+	h.afterEvent("reset_special_color")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

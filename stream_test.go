@@ -84,6 +84,9 @@ type mockScreen struct {
 	resetColor          func(int, bool)
 	setDynamicColor     func(int, string)
 	queryDynamicColor   func(int)
+	setSpecialColor     func(int, string)
+	querySpecialColor   func(int)
+	resetSpecialColor   func(int, bool)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -408,6 +411,24 @@ func (m *mockScreen) SetDynamicColor(index int, value string) {
 func (m *mockScreen) QueryDynamicColor(index int) {
 	if m.queryDynamicColor != nil {
 		m.queryDynamicColor(index)
+	}
+}
+
+func (m *mockScreen) SetSpecialColor(index int, value string) {
+	if m.setSpecialColor != nil {
+		m.setSpecialColor(index, value)
+	}
+}
+
+func (m *mockScreen) QuerySpecialColor(index int) {
+	if m.querySpecialColor != nil {
+		m.querySpecialColor(index)
+	}
+}
+
+func (m *mockScreen) ResetSpecialColor(index int, all bool) {
+	if m.resetSpecialColor != nil {
+		m.resetSpecialColor(index, all)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

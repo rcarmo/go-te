@@ -53,6 +53,7 @@ type Screen struct {
 	selectionData    map[string]string
 	colorPalette     map[int]string
 	dynamicColors    map[int]string
+	specialColors    map[int]string
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -94,6 +95,7 @@ func (s *Screen) Reset() {
 	s.selectionData = make(map[string]string)
 	s.colorPalette = make(map[int]string)
 	s.dynamicColors = make(map[int]string)
+	s.specialColors = make(map[int]string)
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -1114,6 +1116,7 @@ func (s *Screen) SoftReset() {
 	s.selectionData = make(map[string]string)
 	s.colorPalette = make(map[int]string)
 	s.dynamicColors = make(map[int]string)
+	s.specialColors = make(map[int]string)
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1425,6 +1428,38 @@ func (s *Screen) QueryDynamicColor(index int) {
 		}
 	}
 	s.WriteProcessInput(ControlOSC + fmt.Sprintf("%d;%s", index, value) + ControlST)
+}
+
+func (s *Screen) SetSpecialColor(index int, value string) {
+	normalized, ok := normalizeColorSpec(value)
+	if !ok {
+		return
+	}
+	if s.specialColors == nil {
+		s.specialColors = make(map[int]string)
+	}
+	s.specialColors[index] = normalized
+}
+
+func (s *Screen) QuerySpecialColor(index int) {
+	value := "rgb:0000/0000/0000"
+	if s.specialColors != nil {
+		if v, ok := s.specialColors[index]; ok {
+			value = v
+		}
+	}
+	s.WriteProcessInput(ControlOSC + fmt.Sprintf("5;%d;%s", index, value) + ControlST)
+}
+
+func (s *Screen) ResetSpecialColor(index int, all bool) {
+	if s.specialColors == nil {
+		return
+	}
+	if all {
+		s.specialColors = make(map[int]string)
+		return
+	}
+	delete(s.specialColors, index)
 }
 
 func normalizeColorSpec(spec string) (string, bool) {
