@@ -254,6 +254,8 @@ func (st *Stream) handleGround(ch rune) error {
 	case '\x90':
 		st.state = stateDCS
 		st.dcsData = ""
+	case '\x9a':
+		st.listener.ReportDeviceAttributes(0, true, '?')
 	case '\x98':
 		st.state = stateSOS
 	case '\x9b':
@@ -322,6 +324,8 @@ func (st *Stream) handleEscape(ch rune) error {
 		st.listener.SaveCursor()
 	case '8':
 		st.listener.RestoreCursor()
+	case 'Z':
+		st.listener.ReportDeviceAttributes(0, true, '?')
 	default:
 		return nil
 	}
@@ -660,7 +664,7 @@ func (st *Stream) isPlainText(ch rune) bool {
 		return false
 	}
 	switch ch {
-	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f', '\x84', '\x85', '\x88', '\x8d', '\x90', '\x98', '\x9e', '\x9f':
+	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f', '\x84', '\x85', '\x88', '\x8d', '\x90', '\x98', '\x9a', '\x9e', '\x9f':
 		return false
 	}
 	return true
