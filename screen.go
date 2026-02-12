@@ -2,6 +2,7 @@ package te
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -50,6 +51,7 @@ type Screen struct {
 	wrapNext          bool
 	savedModes        map[int]bool
 	selectionData    map[string]string
+	colorPalette     map[int]string
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -89,6 +91,7 @@ func (s *Screen) Reset() {
 	s.wrapNext = false
 	s.savedModes = make(map[int]bool)
 	s.selectionData = make(map[string]string)
+	s.colorPalette = make(map[int]string)
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -1107,6 +1110,7 @@ func (s *Screen) SoftReset() {
 	s.Savepoints = nil
 	s.savedModes = make(map[int]bool)
 	s.selectionData = make(map[string]string)
+	s.colorPalette = make(map[int]string)
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1365,6 +1369,75 @@ func (s *Screen) QuerySelectionData(selection string) {
 		}
 	}
 	s.WriteProcessInput(ControlOSC + "52;" + selection + ";" + data + ControlST)
+}
+
+func (s *Screen) SetColor(index int, value string) {
+	normalized, ok := normalizeColorSpec(value)
+	if !ok {
+		return
+	}
+	if s.colorPalette == nil {
+		s.colorPalette = make(map[int]string)
+	}
+	s.colorPalette[index] = normalized
+}
+
+func (s *Screen) QueryColor(index int) {
+	value := "rgb:0000/0000/0000"
+	if s.colorPalette != nil {
+		if v, ok := s.colorPalette[index]; ok {
+			value = v
+		}
+	}
+	s.WriteProcessInput(ControlOSC + fmt.Sprintf("4;%d;%s", index, value) + ControlST)
+}
+
+func normalizeColorSpec(spec string) (string, bool) {
+	if strings.HasPrefix(spec, "rgb:") {
+		parts := strings.Split(spec[4:], "/")
+		if len(parts) != 3 {
+			return "", false
+		}
+		return fmt.Sprintf("rgb:%s/%s/%s", normalizeHexComponent(parts[0]), normalizeHexComponent(parts[1]), normalizeHexComponent(parts[2])), true
+	}
+	if strings.HasPrefix(spec, "#") {
+		hex := spec[1:]
+		if len(hex)%3 != 0 {
+			return "", false
+		}
+		size := len(hex) / 3
+		if size < 1 || size > 4 {
+			return "", false
+		}
+		return fmt.Sprintf("rgb:%s/%s/%s", normalizeHexComponent(hex[0:size]), normalizeHexComponent(hex[size:2*size]), normalizeHexComponent(hex[2*size:])), true
+	}
+	return "", false
+}
+
+func normalizeHexComponent(component string) string {
+	value, err := strconv.ParseInt(component, 16, 32)
+	if err != nil {
+		return "0000"
+	}
+	byteValue := 0
+	switch len(component) {
+	case 1:
+		byteValue = int(value) << 4
+	case 2:
+		byteValue = int(value)
+	case 3:
+		byteValue = int(value) >> 4
+	default:
+		byteValue = int(value) >> 8
+	}
+	if byteValue < 0 {
+		byteValue = 0
+	}
+	if byteValue > 255 {
+		byteValue = 255
+	}
+	full := (byteValue << 8) | byteValue
+	return fmt.Sprintf("%04x", full)
 }
 
 func (s *Screen) Debug(_ ...interface{}) {

@@ -3,6 +3,7 @@ package te
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -74,6 +75,8 @@ type EventHandler interface {
 	SetIconName(param string)
 	SetSelectionData(selection, data string)
 	QuerySelectionData(selection string)
+	SetColor(index int, value string)
+	QueryColor(index int)
 }
 
 type Stream struct {
@@ -495,6 +498,19 @@ func (st *Stream) finishOSC() {
 			} else {
 				st.listener.SetSelectionData(selection, chunks[2])
 			}
+		}
+	case "4":
+		for i := 1; i+1 < len(chunks); i += 2 {
+			idx, err := strconv.Atoi(chunks[i])
+			if err != nil {
+				continue
+			}
+			spec := chunks[i+1]
+			if spec == "?" {
+				st.listener.QueryColor(idx)
+				continue
+			}
+			st.listener.SetColor(idx, spec)
 		}
 	}
 	st.current = ""

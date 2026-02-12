@@ -174,6 +174,14 @@ func (d *DebugScreen) SetSelectionData(selection, data string) {
 func (d *DebugScreen) QuerySelectionData(selection string) {
 	d.record("query_selection_data", []interface{}{selection}, map[string]interface{}{})
 }
+
+func (d *DebugScreen) SetColor(index int, value string) {
+	d.record("set_color", []interface{}{index, value}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) QueryColor(index int) {
+	d.record("query_color", []interface{}{index}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

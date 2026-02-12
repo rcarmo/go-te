@@ -407,6 +407,18 @@ func (h *HistoryScreen) QuerySelectionData(selection string) {
 	h.afterEvent("query_selection_data")
 }
 
+func (h *HistoryScreen) SetColor(index int, value string) {
+	h.beforeEvent("set_color")
+	h.Screen.SetColor(index, value)
+	h.afterEvent("set_color")
+}
+
+func (h *HistoryScreen) QueryColor(index int) {
+	h.beforeEvent("query_color")
+	h.Screen.QueryColor(index)
+	h.afterEvent("query_color")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

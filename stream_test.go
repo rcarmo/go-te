@@ -79,6 +79,8 @@ type mockScreen struct {
 	copyRectangle       func(int, int, int, int, int, int)
 	setSelectionData    func(string, string)
 	querySelectionData  func(string)
+	setColor            func(int, string)
+	queryColor          func(int)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -373,6 +375,18 @@ func (m *mockScreen) SetSelectionData(selection, data string) {
 func (m *mockScreen) QuerySelectionData(selection string) {
 	if m.querySelectionData != nil {
 		m.querySelectionData(selection)
+	}
+}
+
+func (m *mockScreen) SetColor(index int, value string) {
+	if m.setColor != nil {
+		m.setColor(index, value)
+	}
+}
+
+func (m *mockScreen) QueryColor(index int) {
+	if m.queryColor != nil {
+		m.queryColor(index)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {
