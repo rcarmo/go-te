@@ -28,3 +28,30 @@ func TestEsctest2XtermWinopsReportTextAreaChars(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", responses)
 	}
 }
+
+func TestEsctest2XtermWinopsReportScreenSizeChars(t *testing.T) {
+	screen := NewScreen(12, 4)
+	stream := NewStream(screen, false)
+	responses := []string{}
+	screen.WriteProcessInput = func(data string) { responses = append(responses, data) }
+	if err := stream.Feed(ControlCSI + "19t"); err != nil {
+		t.Fatalf("feed: %v", err)
+	}
+	if len(responses) == 0 || responses[len(responses)-1] != ControlCSI+"9;4;12t" {
+		t.Fatalf("unexpected response: %#v", responses)
+	}
+}
+
+func TestEsctest2XtermWinopsReportIconTitle(t *testing.T) {
+	screen := NewScreen(10, 2)
+	stream := NewStream(screen, false)
+	responses := []string{}
+	screen.WriteProcessInput = func(data string) { responses = append(responses, data) }
+	screen.IconName = "icon"
+	if err := stream.Feed(ControlCSI + "20t"); err != nil {
+		t.Fatalf("feed: %v", err)
+	}
+	if len(responses) == 0 || responses[len(responses)-1] != ControlOSC+"L"+screen.IconName+ControlST {
+		t.Fatalf("unexpected response: %#v", responses)
+	}
+}
