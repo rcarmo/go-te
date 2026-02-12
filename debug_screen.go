@@ -130,6 +130,14 @@ func (d *DebugScreen) RequestStatusString(query string) {
 func (d *DebugScreen) SoftReset() {
 	d.record("soft_reset", nil, map[string]interface{}{})
 }
+
+func (d *DebugScreen) SaveModes(modes []int) {
+	d.record("save_modes", []interface{}{modes}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) RestoreModes(modes []int) {
+	d.record("restore_modes", []interface{}{modes}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

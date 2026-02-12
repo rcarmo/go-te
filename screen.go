@@ -48,6 +48,7 @@ type Screen struct {
 	rightMargin       int
 	lineWrapped       map[int]bool
 	wrapNext          bool
+	savedModes        map[int]bool
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -85,6 +86,7 @@ func (s *Screen) Reset() {
 	s.rightMargin = s.Columns - 1
 	s.lineWrapped = make(map[int]bool)
 	s.wrapNext = false
+	s.savedModes = make(map[int]bool)
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -149,6 +151,7 @@ func (s *Screen) Resize(lines, columns int) {
 	s.rightMargin = s.Columns - 1
 	s.lineWrapped = make(map[int]bool)
 	s.wrapNext = false
+	s.savedModes = make(map[int]bool)
 }
 
 func (s *Screen) Display() []string {
@@ -1084,6 +1087,33 @@ func (s *Screen) SoftReset() {
 	s.G1 = charsetVT100
 	s.Charset = 0
 	s.Savepoints = nil
+	s.savedModes = make(map[int]bool)
+}
+
+func (s *Screen) SaveModes(modes []int) {
+	if s.savedModes == nil {
+		s.savedModes = make(map[int]bool)
+	}
+	for _, mode := range modes {
+		key := mode << 5
+		_, ok := s.Mode[key]
+		s.savedModes[key] = ok
+	}
+}
+
+func (s *Screen) RestoreModes(modes []int) {
+	for _, mode := range modes {
+		key := mode << 5
+		state, ok := s.savedModes[key]
+		if !ok {
+			continue
+		}
+		if state {
+			s.applySetMode(mode, true)
+		} else {
+			s.applyResetMode(mode, true)
+		}
+	}
 }
 
 func (s *Screen) Debug(_ ...interface{}) {

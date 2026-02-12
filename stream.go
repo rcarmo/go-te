@@ -52,6 +52,8 @@ type EventHandler interface {
 	ReportMode(mode int, private bool)
 	RequestStatusString(query string)
 	SoftReset()
+	SaveModes(modes []int)
+	RestoreModes(modes []int)
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -555,6 +557,10 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 	case 'n':
 		st.listener.ReportDeviceStatus(defaultParam(params, 0, 0), st.private, st.csiPrefix)
 	case 'r':
+		if st.private {
+			st.listener.RestoreModes(params)
+			return
+		}
 		if len(params) == 0 {
 			st.listener.SetMargins(0, 0)
 			return
@@ -566,11 +572,12 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		}
 		st.listener.SetMargins(top, bottom)
 	case 's':
-		if len(params) >= 2 {
-			st.listener.SetLeftRightMargins(defaultParam(params, 0, 0), defaultParam(params, 1, 0))
+		if st.private {
+			st.listener.SaveModes(params)
 			return
 		}
-		if st.private {
+		if len(params) >= 2 {
+			st.listener.SetLeftRightMargins(defaultParam(params, 0, 0), defaultParam(params, 1, 0))
 			return
 		}
 		if mc, ok := st.listener.(interface{ isModeSet(int) bool }); ok {

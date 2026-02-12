@@ -68,6 +68,8 @@ type mockScreen struct {
 	reportMode          func(int, bool)
 	requestStatusString func(string)
 	softReset           func()
+	saveModes           func([]int)
+	restoreModes        func([]int)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -296,6 +298,18 @@ func (m *mockScreen) RequestStatusString(query string) {
 func (m *mockScreen) SoftReset() {
 	if m.softReset != nil {
 		m.softReset()
+	}
+}
+
+func (m *mockScreen) SaveModes(modes []int) {
+	if m.saveModes != nil {
+		m.saveModes(modes)
+	}
+}
+
+func (m *mockScreen) RestoreModes(modes []int) {
+	if m.restoreModes != nil {
+		m.restoreModes(modes)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

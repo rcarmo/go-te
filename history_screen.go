@@ -341,6 +341,18 @@ func (h *HistoryScreen) SoftReset() {
 	h.afterEvent("soft_reset")
 }
 
+func (h *HistoryScreen) SaveModes(modes []int) {
+	h.beforeEvent("save_modes")
+	h.Screen.SaveModes(modes)
+	h.afterEvent("save_modes")
+}
+
+func (h *HistoryScreen) RestoreModes(modes []int) {
+	h.beforeEvent("restore_modes")
+	h.Screen.RestoreModes(modes)
+	h.afterEvent("restore_modes")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)
