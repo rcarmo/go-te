@@ -1132,6 +1132,42 @@ func (s *Screen) RestoreModes(modes []int) {
 	}
 }
 
+func (s *Screen) ForwardIndex() {
+	left, right := s.horizontalMargins()
+	top, bottom := s.scrollRegion()
+	if s.isModeSet(ModeDECLRMM) {
+		if s.Cursor.Col < left || s.Cursor.Col > right {
+			if s.Cursor.Col < s.Columns-1 {
+				s.Cursor.Col++
+			}
+			return
+		}
+	}
+	if s.Cursor.Col < right {
+		s.Cursor.Col++
+		return
+	}
+	s.shiftHorizontal(left, right, top, bottom, -1)
+}
+
+func (s *Screen) BackIndex() {
+	left, right := s.horizontalMargins()
+	top, bottom := s.scrollRegion()
+	if s.isModeSet(ModeDECLRMM) {
+		if s.Cursor.Col < left || s.Cursor.Col > right {
+			if s.Cursor.Col > 0 {
+				s.Cursor.Col--
+			}
+			return
+		}
+	}
+	if s.Cursor.Col > left {
+		s.Cursor.Col--
+		return
+	}
+	s.shiftHorizontal(left, right, top, bottom, 1)
+}
+
 func (s *Screen) Debug(_ ...interface{}) {
 }
 
@@ -1342,6 +1378,34 @@ func (s *Screen) clearRowSegment(row, left, right int) {
 			continue
 		}
 		s.Buffer[row][col] = s.defaultCell()
+	}
+}
+
+func (s *Screen) shiftHorizontal(left, right, top, bottom, direction int) {
+	if left < 0 {
+		left = 0
+	}
+	if right >= s.Columns {
+		right = s.Columns - 1
+	}
+	if left > right {
+		return
+	}
+	for row := top; row <= bottom && row < s.Lines; row++ {
+		if row < 0 {
+			continue
+		}
+		if direction < 0 {
+			for col := left; col < right; col++ {
+				s.Buffer[row][col] = s.Buffer[row][col+1]
+			}
+			s.Buffer[row][right] = s.defaultCell()
+		} else {
+			for col := right; col > left; col-- {
+				s.Buffer[row][col] = s.Buffer[row][col-1]
+			}
+			s.Buffer[row][left] = s.defaultCell()
+		}
 	}
 }
 

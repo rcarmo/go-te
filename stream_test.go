@@ -70,6 +70,8 @@ type mockScreen struct {
 	softReset           func()
 	saveModes           func([]int)
 	restoreModes        func([]int)
+	forwardIndex        func()
+	backIndex           func()
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -310,6 +312,18 @@ func (m *mockScreen) SaveModes(modes []int) {
 func (m *mockScreen) RestoreModes(modes []int) {
 	if m.restoreModes != nil {
 		m.restoreModes(modes)
+	}
+}
+
+func (m *mockScreen) ForwardIndex() {
+	if m.forwardIndex != nil {
+		m.forwardIndex()
+	}
+}
+
+func (m *mockScreen) BackIndex() {
+	if m.backIndex != nil {
+		m.backIndex()
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

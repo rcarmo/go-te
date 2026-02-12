@@ -54,6 +54,8 @@ type EventHandler interface {
 	SoftReset()
 	SaveModes(modes []int)
 	RestoreModes(modes []int)
+	ForwardIndex()
+	BackIndex()
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -324,6 +326,10 @@ func (st *Stream) handleEscape(ch rune) error {
 		st.listener.SaveCursor()
 	case '8':
 		st.listener.RestoreCursor()
+	case '6':
+		st.listener.BackIndex()
+	case '9':
+		st.listener.ForwardIndex()
 	case 'Z':
 		st.listener.ReportDeviceAttributes(0, true, '?')
 	default:

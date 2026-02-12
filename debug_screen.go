@@ -138,6 +138,14 @@ func (d *DebugScreen) SaveModes(modes []int) {
 func (d *DebugScreen) RestoreModes(modes []int) {
 	d.record("restore_modes", []interface{}{modes}, map[string]interface{}{})
 }
+
+func (d *DebugScreen) ForwardIndex() {
+	d.record("forward_index", nil, map[string]interface{}{})
+}
+
+func (d *DebugScreen) BackIndex() {
+	d.record("back_index", nil, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

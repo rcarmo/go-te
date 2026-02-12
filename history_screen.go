@@ -353,6 +353,18 @@ func (h *HistoryScreen) RestoreModes(modes []int) {
 	h.afterEvent("restore_modes")
 }
 
+func (h *HistoryScreen) ForwardIndex() {
+	h.beforeEvent("forward_index")
+	h.Screen.ForwardIndex()
+	h.afterEvent("forward_index")
+}
+
+func (h *HistoryScreen) BackIndex() {
+	h.beforeEvent("back_index")
+	h.Screen.BackIndex()
+	h.afterEvent("back_index")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)
