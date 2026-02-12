@@ -154,6 +154,14 @@ func (d *DebugScreen) InsertColumns(count int) {
 func (d *DebugScreen) DeleteColumns(count int) {
 	d.record("delete_columns", []interface{}{count}, map[string]interface{}{})
 }
+
+func (d *DebugScreen) EraseRectangle(top, left, bottom, right int) {
+	d.record("erase_rectangle", []interface{}{top, left, bottom, right}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) FillRectangle(ch rune, top, left, bottom, right int) {
+	d.record("fill_rectangle", []interface{}{string(ch), top, left, bottom, right}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

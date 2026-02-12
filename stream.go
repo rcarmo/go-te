@@ -58,6 +58,8 @@ type EventHandler interface {
 	BackIndex()
 	InsertColumns(count int)
 	DeleteColumns(count int)
+	EraseRectangle(top, left, bottom, right int)
+	FillRectangle(ch rune, top, left, bottom, right int)
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -617,6 +619,15 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		}
 		if st.csiIntermediate == '\'' && final == '~' {
 			st.listener.DeleteColumns(defaultParam(params, 0, 1))
+			return
+		}
+		if st.csiIntermediate == '$' && final == 'z' {
+			st.listener.EraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
+			return
+		}
+		if st.csiIntermediate == '$' && final == 'x' {
+			ch := rune(defaultParam(params, 0, 0))
+			st.listener.FillRectangle(ch, defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1), defaultParam(params, 4, 1))
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'y' {

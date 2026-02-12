@@ -1226,6 +1226,61 @@ func (s *Screen) DeleteColumns(count int) {
 	}
 }
 
+func (s *Screen) EraseRectangle(top, left, bottom, right int) {
+	s.fillRectangle(top, left, bottom, right, " ")
+}
+
+func (s *Screen) FillRectangle(ch rune, top, left, bottom, right int) {
+	if ch == 0 {
+		return
+	}
+	s.fillRectangle(top, left, bottom, right, string(ch))
+}
+
+func (s *Screen) fillRectangle(top, left, bottom, right int, data string) {
+	if top <= 0 {
+		top = 1
+	}
+	if left <= 0 {
+		left = 1
+	}
+	if bottom <= 0 {
+		bottom = s.Lines
+	}
+	if right <= 0 {
+		right = s.Columns
+	}
+	if s.isModeSet(ModeDECOM) && s.Margins != nil {
+		top += s.Margins.Top
+		bottom += s.Margins.Top
+		if s.isModeSet(ModeDECLRMM) {
+			left += s.leftMargin
+			right += s.leftMargin
+		}
+	}
+	if top > bottom || left > right {
+		return
+	}
+	if top < 1 {
+		top = 1
+	}
+	if left < 1 {
+		left = 1
+	}
+	if bottom > s.Lines {
+		bottom = s.Lines
+	}
+	if right > s.Columns {
+		right = s.Columns
+	}
+	for row := top - 1; row <= bottom-1; row++ {
+		for col := left - 1; col <= right-1; col++ {
+			s.Buffer[row][col] = Cell{Data: data, Attr: s.defaultAttr()}
+		}
+		s.Dirty[row] = struct{}{}
+	}
+}
+
 func (s *Screen) Debug(_ ...interface{}) {
 }
 

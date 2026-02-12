@@ -377,6 +377,18 @@ func (h *HistoryScreen) DeleteColumns(count int) {
 	h.afterEvent("delete_columns")
 }
 
+func (h *HistoryScreen) EraseRectangle(top, left, bottom, right int) {
+	h.beforeEvent("erase_rectangle")
+	h.Screen.EraseRectangle(top, left, bottom, right)
+	h.afterEvent("erase_rectangle")
+}
+
+func (h *HistoryScreen) FillRectangle(ch rune, top, left, bottom, right int) {
+	h.beforeEvent("fill_rectangle")
+	h.Screen.FillRectangle(ch, top, left, bottom, right)
+	h.afterEvent("fill_rectangle")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)
