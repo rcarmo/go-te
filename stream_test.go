@@ -72,6 +72,8 @@ type mockScreen struct {
 	restoreModes        func([]int)
 	forwardIndex        func()
 	backIndex           func()
+	insertColumns       func(int)
+	deleteColumns       func(int)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -324,6 +326,18 @@ func (m *mockScreen) ForwardIndex() {
 func (m *mockScreen) BackIndex() {
 	if m.backIndex != nil {
 		m.backIndex()
+	}
+}
+
+func (m *mockScreen) InsertColumns(count int) {
+	if m.insertColumns != nil {
+		m.insertColumns(count)
+	}
+}
+
+func (m *mockScreen) DeleteColumns(count int) {
+	if m.deleteColumns != nil {
+		m.deleteColumns(count)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

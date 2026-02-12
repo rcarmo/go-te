@@ -1168,6 +1168,64 @@ func (s *Screen) BackIndex() {
 	s.shiftHorizontal(left, right, top, bottom, 1)
 }
 
+func (s *Screen) InsertColumns(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	left, right := s.horizontalMargins()
+	if s.Cursor.Row < top || s.Cursor.Row > bottom {
+		return
+	}
+	if s.isModeSet(ModeDECLRMM) && (s.Cursor.Col < left || s.Cursor.Col > right) {
+		return
+	}
+	if right < left {
+		return
+	}
+	if count > right-s.Cursor.Col+1 {
+		count = right - s.Cursor.Col + 1
+	}
+	s.markDirtyRange(top, bottom)
+	for row := top; row <= bottom; row++ {
+		for col := right; col >= s.Cursor.Col+count; col-- {
+			s.Buffer[row][col] = s.Buffer[row][col-count]
+		}
+		for col := s.Cursor.Col; col < s.Cursor.Col+count && col <= right; col++ {
+			s.Buffer[row][col] = s.defaultCell()
+		}
+	}
+}
+
+func (s *Screen) DeleteColumns(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	left, right := s.horizontalMargins()
+	if s.Cursor.Row < top || s.Cursor.Row > bottom {
+		return
+	}
+	if s.isModeSet(ModeDECLRMM) && (s.Cursor.Col < left || s.Cursor.Col > right) {
+		return
+	}
+	if right < left {
+		return
+	}
+	if count > right-s.Cursor.Col+1 {
+		count = right - s.Cursor.Col + 1
+	}
+	s.markDirtyRange(top, bottom)
+	for row := top; row <= bottom; row++ {
+		for col := s.Cursor.Col; col <= right-count; col++ {
+			s.Buffer[row][col] = s.Buffer[row][col+count]
+		}
+		for col := right - count + 1; col <= right; col++ {
+			s.Buffer[row][col] = s.defaultCell()
+		}
+	}
+}
+
 func (s *Screen) Debug(_ ...interface{}) {
 }
 

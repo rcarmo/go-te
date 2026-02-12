@@ -365,6 +365,18 @@ func (h *HistoryScreen) BackIndex() {
 	h.afterEvent("back_index")
 }
 
+func (h *HistoryScreen) InsertColumns(count int) {
+	h.beforeEvent("insert_columns")
+	h.Screen.InsertColumns(count)
+	h.afterEvent("insert_columns")
+}
+
+func (h *HistoryScreen) DeleteColumns(count int) {
+	h.beforeEvent("delete_columns")
+	h.Screen.DeleteColumns(count)
+	h.afterEvent("delete_columns")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

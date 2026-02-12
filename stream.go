@@ -56,6 +56,8 @@ type EventHandler interface {
 	RestoreModes(modes []int)
 	ForwardIndex()
 	BackIndex()
+	InsertColumns(count int)
+	DeleteColumns(count int)
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -607,6 +609,14 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		}
 		if st.csiIntermediate == '!' && final == 'p' {
 			st.listener.SoftReset()
+			return
+		}
+		if st.csiIntermediate == '\'' && final == '}' {
+			st.listener.InsertColumns(defaultParam(params, 0, 1))
+			return
+		}
+		if st.csiIntermediate == '\'' && final == '~' {
+			st.listener.DeleteColumns(defaultParam(params, 0, 1))
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'y' {

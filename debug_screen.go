@@ -146,6 +146,14 @@ func (d *DebugScreen) ForwardIndex() {
 func (d *DebugScreen) BackIndex() {
 	d.record("back_index", nil, map[string]interface{}{})
 }
+
+func (d *DebugScreen) InsertColumns(count int) {
+	d.record("insert_columns", []interface{}{count}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) DeleteColumns(count int) {
+	d.record("delete_columns", []interface{}{count}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }
