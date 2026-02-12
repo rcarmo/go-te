@@ -29,6 +29,7 @@ type mockScreen struct {
 	backspace           func()
 	tab                 func()
 	linefeed            func()
+	nextLine            func()
 	carriageReturn      func()
 	shiftOut            func()
 	shiftIn             func()
@@ -48,8 +49,10 @@ type mockScreen struct {
 	cursorDown1         func(int)
 	cursorUp1           func(int)
 	cursorToColumn      func(int)
+	cursorToColumnAbs   func(int)
 	cursorPosition      func(int, int)
 	cursorBackTab       func(int)
+	cursorForwardTab    func(int)
 	scrollUp            func(int)
 	scrollDown          func(int)
 	repeatLast          func(int)
@@ -59,9 +62,12 @@ type mockScreen struct {
 	deleteLines         func(int)
 	deleteCharacters    func(int)
 	eraseCharacters     func(int)
-	reportDeviceAttrs   func(int, bool)
+	reportDeviceAttrs   func(int, bool, rune)
 	cursorToLine        func(int)
-	reportDeviceStatus  func(int)
+	reportDeviceStatus  func(int, bool, rune)
+	reportMode          func(int, bool)
+	requestStatusString func(string)
+	softReset           func()
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -97,6 +103,11 @@ func (m *mockScreen) LineFeed() {
 func (m *mockScreen) CarriageReturn() {
 	if m.carriageReturn != nil {
 		m.carriageReturn()
+	}
+}
+func (m *mockScreen) NextLine() {
+	if m.nextLine != nil {
+		m.nextLine()
 	}
 }
 func (m *mockScreen) ShiftOut() {
@@ -189,6 +200,11 @@ func (m *mockScreen) CursorToColumn(column int) {
 		m.cursorToColumn(column)
 	}
 }
+func (m *mockScreen) CursorToColumnAbsolute(column int) {
+	if m.cursorToColumnAbs != nil {
+		m.cursorToColumnAbs(column)
+	}
+}
 func (m *mockScreen) CursorPosition(line, col int) {
 	if m.cursorPosition != nil {
 		m.cursorPosition(line, col)
@@ -197,6 +213,11 @@ func (m *mockScreen) CursorPosition(line, col int) {
 func (m *mockScreen) CursorBackTab(count int) {
 	if m.cursorBackTab != nil {
 		m.cursorBackTab(count)
+	}
+}
+func (m *mockScreen) CursorForwardTab(count int) {
+	if m.cursorForwardTab != nil {
+		m.cursorForwardTab(count)
 	}
 }
 func (m *mockScreen) ScrollUp(count int) {
@@ -244,9 +265,9 @@ func (m *mockScreen) EraseCharacters(count int) {
 		m.eraseCharacters(count)
 	}
 }
-func (m *mockScreen) ReportDeviceAttributes(mode int, private bool) {
+func (m *mockScreen) ReportDeviceAttributes(mode int, private bool, prefix rune) {
 	if m.reportDeviceAttrs != nil {
-		m.reportDeviceAttrs(mode, private)
+		m.reportDeviceAttrs(mode, private, prefix)
 	}
 }
 func (m *mockScreen) CursorToLine(line int) {
@@ -254,9 +275,27 @@ func (m *mockScreen) CursorToLine(line int) {
 		m.cursorToLine(line)
 	}
 }
-func (m *mockScreen) ReportDeviceStatus(mode int) {
+func (m *mockScreen) ReportDeviceStatus(mode int, private bool, prefix rune) {
 	if m.reportDeviceStatus != nil {
-		m.reportDeviceStatus(mode)
+		m.reportDeviceStatus(mode, private, prefix)
+	}
+}
+
+func (m *mockScreen) ReportMode(mode int, private bool) {
+	if m.reportMode != nil {
+		m.reportMode(mode, private)
+	}
+}
+
+func (m *mockScreen) RequestStatusString(query string) {
+	if m.requestStatusString != nil {
+		m.requestStatusString(query)
+	}
+}
+
+func (m *mockScreen) SoftReset() {
+	if m.softReset != nil {
+		m.softReset()
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {
@@ -317,7 +356,7 @@ func TestBasicSequences(t *testing.T) {
 	}{
 		{EscRIS, "reset"},
 		{EscIND, "index"},
-		{EscNEL, "linefeed"},
+		{EscNEL, "next_line"},
 		{EscRI, "reverse_index"},
 		{EscHTS, "set_tab_stop"},
 		{EscDECSC, "save_cursor"},
@@ -333,6 +372,8 @@ func TestBasicSequences(t *testing.T) {
 			screen.index = func() { hits.Call() }
 		case "linefeed":
 			screen.linefeed = func() { hits.Call() }
+		case "next_line":
+			screen.nextLine = func() { hits.Call() }
 		case "reverse_index":
 			screen.reverseIndex = func() { hits.Call() }
 		case "set_tab_stop":

@@ -128,6 +128,12 @@ func (h *HistoryScreen) CarriageReturn() {
 	h.afterEvent("carriage_return")
 }
 
+func (h *HistoryScreen) NextLine() {
+	h.beforeEvent("next_line")
+	h.Screen.NextLine()
+	h.afterEvent("next_line")
+}
+
 func (h *HistoryScreen) ShiftOut() {
 	h.beforeEvent("shift_out")
 	h.Screen.ShiftOut()
@@ -218,6 +224,12 @@ func (h *HistoryScreen) CursorToColumn(column int) {
 	h.afterEvent("cursor_to_column")
 }
 
+func (h *HistoryScreen) CursorToColumnAbsolute(column int) {
+	h.beforeEvent("cursor_to_column_absolute")
+	h.Screen.CursorToColumnAbsolute(column)
+	h.afterEvent("cursor_to_column_absolute")
+}
+
 func (h *HistoryScreen) CursorPosition(line, column int) {
 	h.beforeEvent("cursor_position")
 	h.Screen.CursorPosition(line, column)
@@ -263,9 +275,9 @@ func (h *HistoryScreen) EraseCharacters(count int) {
 	h.afterEvent("erase_characters")
 }
 
-func (h *HistoryScreen) ReportDeviceAttributes(mode int, private bool) {
+func (h *HistoryScreen) ReportDeviceAttributes(mode int, private bool, prefix rune) {
 	h.beforeEvent("report_device_attributes")
-	h.Screen.ReportDeviceAttributes(mode, private)
+	h.Screen.ReportDeviceAttributes(mode, private, prefix)
 	h.afterEvent("report_device_attributes")
 }
 
@@ -279,6 +291,12 @@ func (h *HistoryScreen) CursorBackTab(count int) {
 	h.beforeEvent("cursor_back_tab")
 	h.Screen.CursorBackTab(count)
 	h.afterEvent("cursor_back_tab")
+}
+
+func (h *HistoryScreen) CursorForwardTab(count int) {
+	h.beforeEvent("cursor_forward_tab")
+	h.Screen.CursorForwardTab(count)
+	h.afterEvent("cursor_forward_tab")
 }
 
 func (h *HistoryScreen) ScrollUp(count int) {
@@ -299,10 +317,28 @@ func (h *HistoryScreen) RepeatLast(count int) {
 	h.afterEvent("repeat_last")
 }
 
-func (h *HistoryScreen) ReportDeviceStatus(mode int) {
+func (h *HistoryScreen) ReportDeviceStatus(mode int, private bool, prefix rune) {
 	h.beforeEvent("report_device_status")
-	h.Screen.ReportDeviceStatus(mode)
+	h.Screen.ReportDeviceStatus(mode, private, prefix)
 	h.afterEvent("report_device_status")
+}
+
+func (h *HistoryScreen) ReportMode(mode int, private bool) {
+	h.beforeEvent("report_mode")
+	h.Screen.ReportMode(mode, private)
+	h.afterEvent("report_mode")
+}
+
+func (h *HistoryScreen) RequestStatusString(query string) {
+	h.beforeEvent("request_status_string")
+	h.Screen.RequestStatusString(query)
+	h.afterEvent("request_status_string")
+}
+
+func (h *HistoryScreen) SoftReset() {
+	h.beforeEvent("soft_reset")
+	h.Screen.SoftReset()
+	h.afterEvent("soft_reset")
 }
 
 func (h *HistoryScreen) SetMargins(top, bottom int) {

@@ -30,6 +30,7 @@ func (d *DebugScreen) Bell()           { d.record("bell", nil, map[string]interf
 func (d *DebugScreen) Backspace()      { d.record("backspace", nil, map[string]interface{}{}) }
 func (d *DebugScreen) Tab()            { d.record("tab", nil, map[string]interface{}{}) }
 func (d *DebugScreen) LineFeed()       { d.record("linefeed", nil, map[string]interface{}{}) }
+func (d *DebugScreen) NextLine()       { d.record("next_line", nil, map[string]interface{}{}) }
 func (d *DebugScreen) CarriageReturn() { d.record("carriage_return", nil, map[string]interface{}{}) }
 func (d *DebugScreen) ShiftOut()       { d.record("shift_out", nil, map[string]interface{}{}) }
 func (d *DebugScreen) ShiftIn()        { d.record("shift_in", nil, map[string]interface{}{}) }
@@ -69,11 +70,17 @@ func (d *DebugScreen) CursorUp1(count int) {
 func (d *DebugScreen) CursorToColumn(column int) {
 	d.record("cursor_to_column", []interface{}{column}, map[string]interface{}{})
 }
+func (d *DebugScreen) CursorToColumnAbsolute(column int) {
+	d.record("cursor_to_column_absolute", []interface{}{column}, map[string]interface{}{})
+}
 func (d *DebugScreen) CursorPosition(line, col int) {
 	d.record("cursor_position", []interface{}{line, col}, map[string]interface{}{})
 }
 func (d *DebugScreen) CursorBackTab(count int) {
 	d.record("cursor_back_tab", []interface{}{count}, map[string]interface{}{})
+}
+func (d *DebugScreen) CursorForwardTab(count int) {
+	d.record("cursor_forward_tab", []interface{}{count}, map[string]interface{}{})
 }
 func (d *DebugScreen) ScrollUp(count int) {
 	d.record("scroll_up", []interface{}{count}, map[string]interface{}{})
@@ -102,14 +109,26 @@ func (d *DebugScreen) DeleteCharacters(count int) {
 func (d *DebugScreen) EraseCharacters(count int) {
 	d.record("erase_characters", []interface{}{count}, map[string]interface{}{})
 }
-func (d *DebugScreen) ReportDeviceAttributes(mode int, private bool) {
-	d.record("report_device_attributes", []interface{}{mode}, map[string]interface{}{"private": private})
+func (d *DebugScreen) ReportDeviceAttributes(mode int, private bool, prefix rune) {
+	d.record("report_device_attributes", []interface{}{mode}, map[string]interface{}{"private": private, "prefix": string(prefix)})
 }
 func (d *DebugScreen) CursorToLine(line int) {
 	d.record("cursor_to_line", []interface{}{line}, map[string]interface{}{})
 }
-func (d *DebugScreen) ReportDeviceStatus(mode int) {
-	d.record("report_device_status", []interface{}{mode}, map[string]interface{}{})
+func (d *DebugScreen) ReportDeviceStatus(mode int, private bool, prefix rune) {
+	d.record("report_device_status", []interface{}{mode}, map[string]interface{}{"private": private, "prefix": string(prefix)})
+}
+
+func (d *DebugScreen) ReportMode(mode int, private bool) {
+	d.record("report_mode", []interface{}{mode}, map[string]interface{}{"private": private})
+}
+
+func (d *DebugScreen) RequestStatusString(query string) {
+	d.record("request_status_string", []interface{}{query}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) SoftReset() {
+	d.record("soft_reset", nil, map[string]interface{}{})
 }
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})

@@ -22,6 +22,7 @@ type Savepoint struct {
 	Charset  int
 	Origin   bool
 	Wrap     bool
+	WrapNext bool
 	SavedCol *int
 }
 
@@ -45,6 +46,8 @@ type Screen struct {
 	lastDrawn         string
 	leftMargin        int
 	rightMargin       int
+	lineWrapped       map[int]bool
+	wrapNext          bool
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -76,6 +79,8 @@ func (s *Screen) Reset() {
 	s.SavedColumns = nil
 	s.leftMargin = 0
 	s.rightMargin = s.Columns - 1
+	s.lineWrapped = make(map[int]bool)
+	s.wrapNext = false
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -138,6 +143,8 @@ func (s *Screen) Resize(lines, columns int) {
 	s.SetMargins(0, 0)
 	s.leftMargin = 0
 	s.rightMargin = s.Columns - 1
+	s.lineWrapped = make(map[int]bool)
+	s.wrapNext = false
 }
 
 func (s *Screen) Display() []string {
@@ -184,22 +191,19 @@ loop:
 	for graphemes.Next() {
 		cluster := graphemes.Str()
 		width := runewidth.StringWidth(cluster)
-		limit := s.Columns
+		limit := s.Columns - 1
 		if s.isModeSet(ModeDECLRMM) {
-			limit = s.rightMargin + 1
+			limit = s.rightMargin
 		}
 
-		if s.Cursor.Col == limit {
-			if s.isModeSet(ModeDECAWM) {
-				s.Dirty[s.Cursor.Row] = struct{}{}
-				s.CarriageReturn()
-				s.LineFeed()
-			} else if width > 0 {
-				s.Cursor.Col -= width
-				if s.Cursor.Col < 0 {
-					s.Cursor.Col = 0
-				}
-			}
+		if s.wrapNext && width > 0 {
+			s.wrapNext = false
+			s.Dirty[s.Cursor.Row] = struct{}{}
+			s.CarriageReturn()
+			s.LineFeed()
+		}
+		if width > 0 && s.Cursor.Col > limit {
+			s.Cursor.Col = limit
 		}
 
 		if s.isModeSet(ModeIRM) && width > 0 {
@@ -230,9 +234,17 @@ loop:
 
 		if width > 0 {
 			s.lastDrawn = cluster
-			s.Cursor.Col += width
-			if s.Cursor.Col > limit {
-				s.Cursor.Col = limit
+			nextCol := s.Cursor.Col + width
+			if nextCol > limit {
+				if s.isModeSet(ModeDECAWM) {
+					s.lineWrapped[s.Cursor.Row] = true
+					s.wrapNext = true
+					s.Cursor.Col = limit + 1
+					continue
+				}
+				s.Cursor.Col = limit + 1
+			} else {
+				s.Cursor.Col = nextCol
 			}
 		}
 	}
@@ -248,55 +260,108 @@ func (s *Screen) SetIconName(param string) {
 }
 
 func (s *Screen) CarriageReturn() {
+	s.wrapNext = false
+	if s.isModeSet(ModeDECLRMM) {
+		if s.isModeSet(ModeDECOM) {
+			s.Cursor.Col = s.leftMargin
+			return
+		}
+		if s.Cursor.Col < s.leftMargin {
+			s.Cursor.Col = 0
+			return
+		}
+		s.Cursor.Col = s.leftMargin
+		return
+	}
 	s.Cursor.Col = 0
 }
 
 func (s *Screen) Index() {
+	s.wrapNext = false
 	top, bottom := s.scrollRegion()
 	if s.Cursor.Row == bottom {
+		if !s.canScrollHorizontal() {
+			return
+		}
 		s.markDirtyRange(0, s.Lines-1)
 		for row := top; row < bottom; row++ {
 			s.Buffer[row] = s.Buffer[row+1]
 		}
 		s.Buffer[bottom] = blankLine(s.Columns, s.defaultCell())
-	} else {
-		s.CursorDown(1)
+		return
+	}
+	if s.Cursor.Row < bottom {
+		s.Cursor.Row++
+		return
+	}
+	if s.Cursor.Row < s.Lines-1 {
+		s.Cursor.Row++
 	}
 }
 
 func (s *Screen) ReverseIndex() {
+	s.wrapNext = false
 	top, bottom := s.scrollRegion()
 	if s.Cursor.Row == top {
+		if !s.canScrollHorizontal() {
+			return
+		}
 		s.markDirtyRange(0, s.Lines-1)
 		for row := bottom; row > top; row-- {
 			s.Buffer[row] = s.Buffer[row-1]
 		}
 		s.Buffer[top] = blankLine(s.Columns, s.defaultCell())
-	} else {
-		s.CursorUp(1)
+		return
+	}
+	if s.Cursor.Row > top {
+		s.Cursor.Row--
+		return
+	}
+	if s.Cursor.Row > 0 {
+		s.Cursor.Row--
 	}
 }
 
 func (s *Screen) LineFeed() {
-	s.Index()
+	s.wrapNext = false
+	if !s.canScrollHorizontal() {
+		_, bottom := s.scrollRegion()
+		if s.Cursor.Row < bottom {
+			s.Cursor.Row++
+		} else if s.Cursor.Row > bottom {
+			if s.Cursor.Row < s.Lines-1 {
+				s.Cursor.Row++
+			}
+		}
+	} else {
+		s.Index()
+	}
 	if s.isModeSet(ModeLNM) {
 		s.CarriageReturn()
 	}
 }
 
 func (s *Screen) Tab() {
-	column := s.Columns - 1
+	s.wrapNext = false
+	limit := s.Columns - 1
+	if s.isModeSet(ModeDECLRMM) {
+		limit = s.rightMargin
+	}
+	column := limit
 	for _, stop := range sortedStops(s.TabStops) {
 		if s.Cursor.Col < stop {
 			column = stop
 			break
 		}
 	}
+	if column > limit {
+		column = limit
+	}
 	s.Cursor.Col = column
 }
 
 func (s *Screen) Backspace() {
-	s.CursorBack(1)
+	s.moveLeft(1, true)
 }
 
 func (s *Screen) SaveCursor() {
@@ -309,6 +374,7 @@ func (s *Screen) SaveCursor() {
 		Charset:  s.Charset,
 		Origin:   modeOrigin,
 		Wrap:     modeWrap,
+		WrapNext: s.wrapNext,
 		SavedCol: s.SavedColumns,
 	})
 }
@@ -327,10 +393,15 @@ func (s *Screen) RestoreCursor() {
 	s.Charset = last.Charset
 	if last.Origin {
 		s.SetMode([]int{ModeDECOM}, false)
+	} else {
+		s.ResetMode([]int{ModeDECOM}, false)
 	}
 	if last.Wrap {
 		s.SetMode([]int{ModeDECAWM}, false)
+	} else {
+		s.ResetMode([]int{ModeDECAWM}, false)
 	}
+	s.wrapNext = last.WrapNext
 	s.Cursor = last.Cursor
 	s.ensureHB()
 	s.ensureVB(true)
@@ -496,6 +567,7 @@ func (s *Screen) EnsureCursor() {
 }
 
 func (s *Screen) CursorUp(count int) {
+	s.wrapNext = false
 	if count <= 0 {
 		count = 1
 	}
@@ -504,11 +576,13 @@ func (s *Screen) CursorUp(count int) {
 }
 
 func (s *Screen) CursorUp1(count int) {
+	s.wrapNext = false
 	s.CursorUp(count)
 	s.CarriageReturn()
 }
 
 func (s *Screen) CursorDown(count int) {
+	s.wrapNext = false
 	if count <= 0 {
 		count = 1
 	}
@@ -517,28 +591,22 @@ func (s *Screen) CursorDown(count int) {
 }
 
 func (s *Screen) CursorDown1(count int) {
+	s.wrapNext = false
 	s.CursorDown(count)
 	s.CarriageReturn()
 }
 
 func (s *Screen) CursorBack(count int) {
-	if s.Cursor.Col == s.Columns {
-		s.Cursor.Col--
-	}
-	if count <= 0 {
-		count = 1
-	}
-	s.Cursor.Col -= count
-	s.ensureHB()
+	s.moveLeft(count, true)
 }
 
 func (s *Screen) CursorBackTab(count int) {
+	s.wrapNext = false
 	if count <= 0 {
 		count = 1
 	}
-	left, _ := s.horizontalMargins()
 	for i := 0; i < count; i++ {
-		prev := left
+		prev := 0
 		for stop := range s.TabStops {
 			if stop < s.Cursor.Col && stop > prev {
 				prev = stop
@@ -548,12 +616,120 @@ func (s *Screen) CursorBackTab(count int) {
 	}
 }
 
-func (s *Screen) CursorForward(count int) {
+func (s *Screen) CursorForwardTab(count int) {
+	s.wrapNext = false
 	if count <= 0 {
 		count = 1
 	}
-	s.Cursor.Col += count
-	s.ensureHB()
+	for i := 0; i < count; i++ {
+		s.Tab()
+	}
+}
+
+func (s *Screen) NextLine() {
+	s.wrapNext = false
+	origCol := s.Cursor.Col
+	s.CarriageReturn()
+	if s.isModeSet(ModeDECLRMM) {
+		left, right := s.horizontalMargins()
+		if origCol < left || origCol > right {
+			_, bottom := s.scrollRegion()
+			if s.Cursor.Row < bottom {
+				s.Cursor.Row++
+			} else if s.Cursor.Row > bottom {
+				if s.Cursor.Row < s.Lines-1 {
+					s.Cursor.Row++
+				}
+			}
+			return
+		}
+	}
+	s.Index()
+}
+
+func (s *Screen) moveLeft(count int, reverseWrap bool) {
+	if count <= 0 {
+		count = 1
+	}
+	left, right := s.horizontalMargins()
+	reverseInline := s.isModeSet(ModeReverseWrapInline)
+	reverseExtend := s.isModeSet(ModeReverseWrapExtend)
+	for i := 0; i < count; i++ {
+		if s.wrapNext {
+			s.wrapNext = false
+			if reverseWrap && s.isModeSet(ModeDECAWM) && (reverseInline || reverseExtend) {
+				if s.Cursor.Col == right+1 {
+					s.Cursor.Col = right
+				}
+				continue
+			}
+			if s.Cursor.Col == right+1 {
+				s.Cursor.Col = maxInt(left, right-1)
+				continue
+			}
+			if s.Cursor.Col > 0 {
+				s.Cursor.Col--
+			}
+			continue
+		}
+		if s.Cursor.Col == right+1 {
+			s.Cursor.Col = right
+			continue
+		}
+		if s.Cursor.Col == 0 {
+			if reverseWrap && s.isModeSet(ModeDECAWM) && (reverseInline || reverseExtend) {
+				s.reverseWrapToPreviousLine(left, right, reverseInline, reverseExtend)
+			}
+			continue
+		}
+		if s.isModeSet(ModeDECLRMM) && s.Cursor.Col < left {
+			s.Cursor.Col--
+			continue
+		}
+		if s.Cursor.Col > left {
+			s.Cursor.Col--
+			continue
+		}
+		if s.Cursor.Col < left {
+			s.Cursor.Col--
+			continue
+		}
+		if !reverseWrap || !s.isModeSet(ModeDECAWM) || (!reverseInline && !reverseExtend) {
+			continue
+		}
+		s.reverseWrapToPreviousLine(left, right, reverseInline, reverseExtend)
+	}
+}
+
+func (s *Screen) reverseWrapToPreviousLine(left, right int, reverseInline, reverseExtend bool) {
+	top, bottom := s.scrollRegion()
+	targetRow := s.Cursor.Row - 1
+	if reverseExtend && s.Cursor.Row == top {
+		targetRow = bottom
+	}
+	if targetRow < 0 || targetRow >= s.Lines {
+		return
+	}
+	if reverseInline && !reverseExtend {
+		if !s.lineWrapped[targetRow] {
+			return
+		}
+	}
+	s.Cursor.Row = targetRow
+	s.Cursor.Col = right
+}
+
+func (s *Screen) CursorForward(count int) {
+	s.wrapNext = false
+	if count <= 0 {
+		count = 1
+	}
+	left, right := s.horizontalMargins()
+	if s.isModeSet(ModeDECLRMM) && s.Cursor.Col >= left && s.Cursor.Col <= right {
+		s.Cursor.Col = minInt(s.Cursor.Col+count, right)
+		return
+	}
+	s.Cursor.Col = minInt(s.Cursor.Col+count, s.Columns-1)
 }
 
 func (s *Screen) ScrollUp(count int) {
@@ -603,6 +779,7 @@ func (s *Screen) RepeatLast(count int) {
 }
 
 func (s *Screen) CursorPosition(line, column int) {
+	s.wrapNext = false
 	if column <= 0 {
 		column = 1
 	}
@@ -617,6 +794,12 @@ func (s *Screen) CursorPosition(line, column int) {
 			return
 		}
 	}
+	if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
+		col += s.leftMargin
+		if col < s.leftMargin || col > s.rightMargin {
+			return
+		}
+	}
 	s.Cursor.Row = row
 	s.Cursor.Col = col
 	s.ensureHB()
@@ -624,14 +807,35 @@ func (s *Screen) CursorPosition(line, column int) {
 }
 
 func (s *Screen) CursorToColumn(column int) {
+	s.wrapNext = false
 	if column <= 0 {
 		column = 1
 	}
-	s.Cursor.Col = column - 1
+	col := column - 1
+	if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
+		col += s.leftMargin
+	}
+	s.Cursor.Col = col
 	s.ensureHB()
 }
 
+func (s *Screen) CursorToColumnAbsolute(column int) {
+	s.wrapNext = false
+	if column <= 0 {
+		column = 1
+	}
+	col := column - 1
+	if col < 0 {
+		col = 0
+	}
+	if col >= s.Columns {
+		col = s.Columns - 1
+	}
+	s.Cursor.Col = col
+}
+
 func (s *Screen) CursorToLine(line int) {
+	s.wrapNext = false
 	if line <= 0 {
 		line = 1
 	}
@@ -753,13 +957,38 @@ func (s *Screen) SelectGraphicRendition(attrs []int, private bool) {
 	s.Cursor.Attr = replace
 }
 
-func (s *Screen) ReportDeviceAttributes(mode int, private bool) {
-	if mode == 0 && !private {
+func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune) {
+	if mode != 0 {
+		return
+	}
+	if prefix == '>' {
+		s.WriteProcessInput(ControlCSI + ">0;0;0c")
+		return
+	}
+	if !private {
+		s.WriteProcessInput(ControlCSI + "?6c")
+		return
+	}
+	if prefix == '?' {
 		s.WriteProcessInput(ControlCSI + "?6c")
 	}
 }
 
-func (s *Screen) ReportDeviceStatus(mode int) {
+func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune) {
+	if private && prefix == '?' {
+		if mode == 6 {
+			x := s.Cursor.Col + 1
+			y := s.Cursor.Row + 1
+			if s.isModeSet(ModeDECOM) && s.Margins != nil {
+				y -= s.Margins.Top
+			}
+			if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
+				x -= s.leftMargin
+			}
+			s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%d;1R", y, x))
+		}
+		return
+	}
 	switch mode {
 	case 5:
 		s.WriteProcessInput(ControlCSI + "0n")
@@ -769,8 +998,88 @@ func (s *Screen) ReportDeviceStatus(mode int) {
 		if s.isModeSet(ModeDECOM) && s.Margins != nil {
 			y -= s.Margins.Top
 		}
+		if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
+			x -= s.leftMargin
+		}
 		s.WriteProcessInput(ControlCSI + fmt.Sprintf("%d;%dR", y, x))
 	}
+}
+
+func (s *Screen) ReportMode(mode int, private bool) {
+	check := mode
+	prefix := ""
+	if private {
+		check = mode << 5
+		prefix = "?"
+	}
+	status := 2
+	if s.Mode != nil {
+		if _, ok := s.Mode[check]; ok {
+			status = 1
+		}
+	}
+	s.WriteProcessInput(ControlCSI + fmt.Sprintf("%s%d;%d$y", prefix, mode, status))
+}
+
+func (s *Screen) RequestStatusString(query string) {
+	if query == "" {
+		return
+	}
+	response := ""
+	switch query {
+	case "m":
+		codes := []string{"0"}
+		if s.Cursor.Attr.Bold {
+			codes = append(codes, "1")
+		}
+		if s.Cursor.Attr.Italics {
+			codes = append(codes, "3")
+		}
+		if s.Cursor.Attr.Underline {
+			codes = append(codes, "4")
+		}
+		if s.Cursor.Attr.Blink {
+			codes = append(codes, "5")
+		}
+		if s.Cursor.Attr.Reverse {
+			codes = append(codes, "7")
+		}
+		if s.Cursor.Attr.Conceal {
+			codes = append(codes, "8")
+		}
+		if s.Cursor.Attr.Strikethrough {
+			codes = append(codes, "9")
+		}
+		response = "1$r" + strings.Join(codes, ";") + "m"
+	case "r":
+		top, bottom := s.scrollRegion()
+		response = fmt.Sprintf("1$r%d;%dr", top+1, bottom+1)
+	case "s":
+		if s.isModeSet(ModeDECLRMM) {
+			response = fmt.Sprintf("1$r%d;%ds", s.leftMargin+1, s.rightMargin+1)
+		} else {
+			response = fmt.Sprintf("1$r1;%ds", s.Columns)
+		}
+	case " q":
+		response = "1$r0 q"
+	default:
+		return
+	}
+	s.WriteProcessInput(ControlDCS + response + ControlST)
+}
+
+func (s *Screen) SoftReset() {
+	s.wrapNext = false
+	s.Cursor.Hidden = false
+	s.Margins = nil
+	s.leftMargin = 0
+	s.rightMargin = s.Columns - 1
+	s.Mode = map[int]struct{}{ModeDECAWM: {}, ModeDECTCEM: {}}
+	s.Cursor.Attr = s.defaultAttr()
+	s.G0 = charsetLat1
+	s.G1 = charsetVT100
+	s.Charset = 0
+	s.Savepoints = nil
 }
 
 func (s *Screen) Debug(_ ...interface{}) {
@@ -872,6 +1181,10 @@ func (s *Screen) applySetMode(mode int, private bool) {
 		s.CursorPosition(0, 0)
 	}
 
+	if mode == ModeDECSaveCursor {
+		s.SaveCursor()
+	}
+
 	if mode == ModeDECOM {
 		s.CursorPosition(0, 0)
 	}
@@ -912,6 +1225,10 @@ func (s *Screen) applyResetMode(mode int, private bool) {
 		}
 		s.EraseInDisplay(2, false)
 		s.CursorPosition(0, 0)
+	}
+
+	if mode == ModeDECSaveCursor {
+		s.RestoreCursor()
 	}
 
 	if mode == ModeDECOM {
@@ -968,13 +1285,32 @@ func (s *Screen) horizontalMargins() (int, int) {
 	return 0, s.Columns - 1
 }
 
-func (s *Screen) ensureHB() {
-	left, right := s.horizontalMargins()
-	if s.Cursor.Col < left {
-		s.Cursor.Col = left
+func (s *Screen) canScrollHorizontal() bool {
+	if !s.isModeSet(ModeDECLRMM) {
+		return true
 	}
-	if s.Cursor.Col > right {
-		s.Cursor.Col = right
+	left, right := s.horizontalMargins()
+	return s.Cursor.Col >= left && s.Cursor.Col <= right
+}
+
+func (s *Screen) ensureHB() {
+	if s.isModeSet(ModeDECLRMM) {
+		left, right := s.horizontalMargins()
+		switch {
+		case s.Cursor.Col < left:
+			s.Cursor.Col = maxInt(0, s.Cursor.Col)
+		case s.Cursor.Col > right:
+			s.Cursor.Col = minInt(s.Cursor.Col, s.Columns-1)
+		default:
+			s.Cursor.Col = minInt(maxInt(s.Cursor.Col, left), right)
+		}
+		return
+	}
+	if s.Cursor.Col < 0 {
+		s.Cursor.Col = 0
+	}
+	if s.Cursor.Col >= s.Columns {
+		s.Cursor.Col = s.Columns - 1
 	}
 }
 

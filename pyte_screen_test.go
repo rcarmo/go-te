@@ -872,11 +872,11 @@ func TestPyteReportDeviceAttributes(t *testing.T) {
 	screen := NewScreen(10, 10)
 	acc := []string{}
 	screen.WriteProcessInput = func(data string) { acc = append(acc, data) }
-	screen.ReportDeviceAttributes(42, false)
+	screen.ReportDeviceAttributes(42, false, 0)
 	if len(acc) != 0 {
 		t.Fatalf("expected no output")
 	}
-	screen.ReportDeviceAttributes(0, false)
+	screen.ReportDeviceAttributes(0, false, 0)
 	if acc[len(acc)-1] != ControlCSI+"?6c" {
 		t.Fatalf("unexpected response")
 	}
@@ -886,16 +886,16 @@ func TestPyteReportDeviceStatus(t *testing.T) {
 	screen := NewScreen(10, 10)
 	acc := []string{}
 	screen.WriteProcessInput = func(data string) { acc = append(acc, data) }
-	screen.ReportDeviceStatus(42)
+	screen.ReportDeviceStatus(42, false, 0)
 	if len(acc) != 0 {
 		t.Fatalf("expected no output")
 	}
-	screen.ReportDeviceStatus(5)
+	screen.ReportDeviceStatus(5, false, 0)
 	if acc[len(acc)-1] != ControlCSI+"0n" {
 		t.Fatalf("unexpected status")
 	}
 	screen.CursorToColumn(5)
-	screen.ReportDeviceStatus(6)
+	screen.ReportDeviceStatus(6, false, 0)
 	if acc[len(acc)-1] != ControlCSI+"1;5R" {
 		t.Fatalf("unexpected cursor report")
 	}
@@ -903,7 +903,7 @@ func TestPyteReportDeviceStatus(t *testing.T) {
 	screen.SetMargins(5, 9)
 	screen.SetMode([]int{ModeDECOM}, false)
 	screen.CursorToLine(5)
-	screen.ReportDeviceStatus(6)
+	screen.ReportDeviceStatus(6, false, 0)
 	if acc[len(acc)-1] != ControlCSI+"5;1R" {
 		t.Fatalf("unexpected origin cursor report")
 	}

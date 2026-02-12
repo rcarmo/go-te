@@ -28,4 +28,5 @@ const (
 	ControlOSCC0 = "\x1b]"
 	ControlOSCC1 = "\x9d"
 	ControlOSC   = ControlOSCC0
+	ControlDCS   = ControlESC + "P"
 )

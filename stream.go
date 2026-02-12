@@ -13,6 +13,7 @@ type EventHandler interface {
 	Backspace()
 	Tab()
 	LineFeed()
+	NextLine()
 	CarriageReturn()
 	ShiftOut()
 	ShiftIn()
@@ -32,8 +33,10 @@ type EventHandler interface {
 	CursorDown1(count int)
 	CursorUp1(count int)
 	CursorToColumn(column int)
+	CursorToColumnAbsolute(column int)
 	CursorPosition(line, col int)
 	CursorBackTab(count int)
+	CursorForwardTab(count int)
 	ScrollUp(count int)
 	ScrollDown(count int)
 	RepeatLast(count int)
@@ -43,9 +46,12 @@ type EventHandler interface {
 	DeleteLines(count int)
 	DeleteCharacters(count int)
 	EraseCharacters(count int)
-	ReportDeviceAttributes(mode int, private bool)
+	ReportDeviceAttributes(mode int, private bool, prefix rune)
 	CursorToLine(line int)
-	ReportDeviceStatus(mode int)
+	ReportDeviceStatus(mode int, private bool, prefix rune)
+	ReportMode(mode int, private bool)
+	RequestStatusString(query string)
+	SoftReset()
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -60,15 +66,19 @@ type EventHandler interface {
 
 type Stream struct {
 	listener   EventHandler
-	strict     bool
-	useUTF8    bool
-	state      parserState
-	params     []int
-	current    string
-	private    bool
-	takingText bool
-	oscEsc     bool
-	skipNext   bool
+	strict          bool
+	useUTF8         bool
+	use8BitControls bool
+	state           parserState
+	params          []int
+	current         string
+	private         bool
+	csiPrefix       rune
+	csiIntermediate rune
+	takingText      bool
+	oscEsc          bool
+	skipNext        bool
+	dcsData         string
 }
 
 type parserState int
@@ -85,7 +95,9 @@ const (
 	stateSOS
 	stateCharset
 	stateEscapePercent
+	stateEscapeSpace
 )
+
 
 func NewStream(screen EventHandler, strict bool) *Stream {
 	st := &Stream{strict: strict, useUTF8: true}
@@ -101,9 +113,13 @@ func (st *Stream) Attach(screen EventHandler) {
 	st.params = nil
 	st.current = ""
 	st.private = false
+	st.csiPrefix = 0
+	st.csiIntermediate = 0
+	st.dcsData = ""
 	st.takingText = false
 	st.oscEsc = false
 	st.skipNext = false
+	st.use8BitControls = false
 }
 
 func (st *Stream) Detach(screen EventHandler) {
@@ -188,6 +204,15 @@ func (st *Stream) feedRune(ch rune) error {
 		return st.handleOSC(ch)
 	case stateDCS, stateAPC, statePM, stateSOS:
 		return st.handleString(ch)
+	case stateEscapeSpace:
+		st.state = stateGround
+		switch ch {
+		case 'F':
+			st.use8BitControls = false
+		case 'G':
+			st.use8BitControls = true
+		}
+		return nil
 	default:
 		st.state = stateGround
 	}
@@ -216,6 +241,19 @@ func (st *Stream) handleGround(ch rune) error {
 		}
 	case '\x1b':
 		st.state = stateEscape
+	case '\x84':
+		st.listener.Index()
+	case '\x85':
+		st.listener.NextLine()
+	case '\x88':
+		st.listener.SetTabStop()
+	case '\x8d':
+		st.listener.ReverseIndex()
+	case '\x90':
+		st.state = stateDCS
+		st.dcsData = ""
+	case '\x98':
+		st.state = stateSOS
 	case '\x9b':
 		st.state = stateCSI
 		st.resetCSI()
@@ -223,6 +261,10 @@ func (st *Stream) handleGround(ch rune) error {
 		st.state = stateOSC
 		st.current = ""
 		st.oscEsc = false
+	case '\x9e':
+		st.state = statePM
+	case '\x9f':
+		st.state = stateAPC
 	case '\x00', '\x7f':
 		return nil
 	default:
@@ -244,6 +286,7 @@ func (st *Stream) handleEscape(ch rune) error {
 	case 'P':
 		st.state = stateDCS
 		st.oscEsc = false
+		st.dcsData = ""
 	case '_':
 		st.state = stateAPC
 		st.oscEsc = false
@@ -255,6 +298,8 @@ func (st *Stream) handleEscape(ch rune) error {
 		st.oscEsc = false
 	case '#':
 		st.state = stateSharp
+	case ' ':
+		st.state = stateEscapeSpace
 	case '%':
 		st.current = ""
 		st.state = stateEscapePercent
@@ -266,7 +311,7 @@ func (st *Stream) handleEscape(ch rune) error {
 	case 'D':
 		st.listener.Index()
 	case 'E':
-		st.listener.LineFeed()
+		st.listener.NextLine()
 	case 'M':
 		st.listener.ReverseIndex()
 	case 'H':
@@ -284,6 +329,15 @@ func (st *Stream) handleEscape(ch rune) error {
 func (st *Stream) handleCSI(ch rune) error {
 	if ch == '?' {
 		st.private = true
+		st.csiPrefix = ch
+		return nil
+	}
+	if ch == '>' {
+		st.csiPrefix = ch
+		return nil
+	}
+	if ch >= ' ' && ch <= '/' {
+		st.csiIntermediate = ch
 		return nil
 	}
 	if ch >= '0' && ch <= '9' {
@@ -299,8 +353,7 @@ func (st *Stream) handleCSI(ch rune) error {
 		return nil
 	}
 	if ch == '$' {
-		st.state = stateGround
-		st.skipNext = true
+		st.csiIntermediate = ch
 		return nil
 	}
 	if ch == '\x18' || ch == '\x1a' {
@@ -345,6 +398,28 @@ func (st *Stream) handleOSC(ch rune) error {
 }
 
 func (st *Stream) handleString(ch rune) error {
+	if st.state == stateDCS {
+		if st.oscEsc {
+			st.oscEsc = false
+			if ch == '\\' {
+				st.state = stateGround
+				st.finishDCS()
+				return nil
+			}
+			return nil
+		}
+		if ch == '\x07' || ch == '\x9c' {
+			st.state = stateGround
+			st.finishDCS()
+			return nil
+		}
+		if ch == '\x1b' {
+			st.oscEsc = true
+			return nil
+		}
+		st.dcsData += string(ch)
+		return nil
+	}
 	if st.oscEsc {
 		st.oscEsc = false
 		if ch == '\\' {
@@ -361,6 +436,14 @@ func (st *Stream) handleString(ch rune) error {
 		st.oscEsc = true
 	}
 	return nil
+}
+
+func (st *Stream) finishDCS() {
+	data := st.dcsData
+	st.dcsData = ""
+	if len(data) >= 2 && data[0] == '$' && data[1] == 'q' {
+		st.listener.RequestStatusString(data[2:])
+	}
 }
 
 func (st *Stream) finishOSC() {
@@ -390,6 +473,8 @@ func (st *Stream) resetCSI() {
 	st.params = st.params[:0]
 	st.current = ""
 	st.private = false
+	st.csiPrefix = 0
+	st.csiIntermediate = 0
 }
 
 func (st *Stream) appendParam() {
@@ -441,6 +526,8 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		st.listener.EraseCharacters(defaultParam(params, 0, 1))
 	case 'Z':
 		st.listener.CursorBackTab(defaultParam(params, 0, 1))
+	case 'I':
+		st.listener.CursorForwardTab(defaultParam(params, 0, 1))
 	case 'S':
 		st.listener.ScrollUp(defaultParam(params, 0, 1))
 	case 'T':
@@ -449,8 +536,10 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		st.listener.RepeatLast(defaultParam(params, 0, 1))
 	case 'a':
 		st.listener.CursorForward(defaultParam(params, 0, 1))
+	case '`':
+		st.listener.CursorToColumnAbsolute(defaultParam(params, 0, 1))
 	case 'c':
-		st.listener.ReportDeviceAttributes(defaultParam(params, 0, 0), st.private)
+		st.listener.ReportDeviceAttributes(defaultParam(params, 0, 0), st.private, st.csiPrefix)
 	case 'd':
 		st.listener.CursorToLine(defaultParam(params, 0, 1))
 	case 'e':
@@ -464,7 +553,7 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 	case 'm':
 		st.listener.SelectGraphicRendition(params, st.private)
 	case 'n':
-		st.listener.ReportDeviceStatus(defaultParam(params, 0, 0))
+		st.listener.ReportDeviceStatus(defaultParam(params, 0, 0), st.private, st.csiPrefix)
 	case 'r':
 		if len(params) == 0 {
 			st.listener.SetMargins(0, 0)
@@ -481,12 +570,31 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			st.listener.SetLeftRightMargins(defaultParam(params, 0, 0), defaultParam(params, 1, 0))
 			return
 		}
+		if st.private {
+			return
+		}
+		if mc, ok := st.listener.(interface{ isModeSet(int) bool }); ok {
+			if mc.isModeSet(ModeDECLRMM) {
+				return
+			}
+		}
 		st.listener.SaveCursor()
 	case 'u':
 		st.listener.RestoreCursor()
 	case '\'':
 		st.listener.CursorToColumn(defaultParam(params, 0, 1))
 	default:
+		if st.csiIntermediate == '$' && final == 'p' {
+			st.listener.ReportMode(defaultParam(params, 0, 0), st.private)
+			return
+		}
+		if st.csiIntermediate == '!' && final == 'p' {
+			st.listener.SoftReset()
+			return
+		}
+		if st.csiIntermediate == '$' && final == 'y' {
+			return
+		}
 		args := make([]interface{}, len(params))
 		for i, v := range params {
 			args[i] = v
@@ -545,7 +653,7 @@ func (st *Stream) isPlainText(ch rune) bool {
 		return false
 	}
 	switch ch {
-	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f':
+	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f', '\x84', '\x85', '\x88', '\x8d', '\x90', '\x98', '\x9e', '\x9f':
 		return false
 	}
 	return true
