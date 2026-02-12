@@ -422,12 +422,19 @@ func (s *Screen) InsertLines(count int) {
 	if s.Cursor.Row < top || s.Cursor.Row > bottom {
 		return
 	}
+	left, right := s.horizontalMargins()
+	if s.isModeSet(ModeDECLRMM) && (s.Cursor.Col < left || s.Cursor.Col > right) {
+		return
+	}
 	s.markDirtyRange(s.Cursor.Row, s.Lines-1)
+	if count > bottom-s.Cursor.Row+1 {
+		count = bottom - s.Cursor.Row + 1
+	}
 	for row := bottom; row >= s.Cursor.Row; row-- {
 		if row+count <= bottom {
-			s.Buffer[row+count] = s.Buffer[row]
+			s.copyRowSegment(row, row+count, left, right)
 		}
-		s.Buffer[row] = blankLine(s.Columns, s.defaultCell())
+		s.clearRowSegment(row, left, right)
 	}
 	s.CarriageReturn()
 }
@@ -440,12 +447,19 @@ func (s *Screen) DeleteLines(count int) {
 	if s.Cursor.Row < top || s.Cursor.Row > bottom {
 		return
 	}
+	left, right := s.horizontalMargins()
+	if s.isModeSet(ModeDECLRMM) && (s.Cursor.Col < left || s.Cursor.Col > right) {
+		return
+	}
 	s.markDirtyRange(s.Cursor.Row, s.Lines-1)
+	if count > bottom-s.Cursor.Row+1 {
+		count = bottom - s.Cursor.Row + 1
+	}
 	for row := s.Cursor.Row; row <= bottom; row++ {
 		if row+count <= bottom {
-			s.Buffer[row] = s.Buffer[row+count]
+			s.copyRowSegment(row+count, row, left, right)
 		} else {
-			s.Buffer[row] = blankLine(s.Columns, s.defaultCell())
+			s.clearRowSegment(row, left, right)
 		}
 	}
 	s.CarriageReturn()
