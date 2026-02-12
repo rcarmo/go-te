@@ -76,6 +76,7 @@ type mockScreen struct {
 	deleteColumns       func(int)
 	eraseRectangle      func(int, int, int, int)
 	fillRectangle       func(rune, int, int, int, int)
+	copyRectangle       func(int, int, int, int, int, int)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -352,6 +353,12 @@ func (m *mockScreen) EraseRectangle(top, left, bottom, right int) {
 func (m *mockScreen) FillRectangle(ch rune, top, left, bottom, right int) {
 	if m.fillRectangle != nil {
 		m.fillRectangle(ch, top, left, bottom, right)
+	}
+}
+
+func (m *mockScreen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
+	if m.copyRectangle != nil {
+		m.copyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

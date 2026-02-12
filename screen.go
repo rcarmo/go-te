@@ -1281,6 +1281,66 @@ func (s *Screen) fillRectangle(top, left, bottom, right int, data string) {
 	}
 }
 
+func (s *Screen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
+	if srcTop <= 0 {
+		srcTop = 1
+	}
+	if srcLeft <= 0 {
+		srcLeft = 1
+	}
+	if srcBottom <= 0 {
+		srcBottom = s.Lines
+	}
+	if srcRight <= 0 {
+		srcRight = s.Columns
+	}
+	if dstTop <= 0 {
+		dstTop = 1
+	}
+	if dstLeft <= 0 {
+		dstLeft = 1
+	}
+	if srcTop > srcBottom || srcLeft > srcRight {
+		return
+	}
+	if srcTop < 1 {
+		srcTop = 1
+	}
+	if srcLeft < 1 {
+		srcLeft = 1
+	}
+	if srcBottom > s.Lines {
+		srcBottom = s.Lines
+	}
+	if srcRight > s.Columns {
+		srcRight = s.Columns
+	}
+	height := srcBottom - srcTop + 1
+	width := srcRight - srcLeft + 1
+	if height <= 0 || width <= 0 {
+		return
+	}
+	temp := make([][]Cell, height)
+	for r := 0; r < height; r++ {
+		temp[r] = make([]Cell, width)
+		copy(temp[r], s.Buffer[srcTop-1+r][srcLeft-1:srcLeft-1+width])
+	}
+	for r := 0; r < height; r++ {
+		dstRow := dstTop - 1 + r
+		if dstRow < 0 || dstRow >= s.Lines {
+			continue
+		}
+		for c := 0; c < width; c++ {
+			dstCol := dstLeft - 1 + c
+			if dstCol < 0 || dstCol >= s.Columns {
+				continue
+			}
+			s.Buffer[dstRow][dstCol] = temp[r][c]
+		}
+		s.Dirty[dstRow] = struct{}{}
+	}
+}
+
 func (s *Screen) Debug(_ ...interface{}) {
 }
 

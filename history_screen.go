@@ -389,6 +389,12 @@ func (h *HistoryScreen) FillRectangle(ch rune, top, left, bottom, right int) {
 	h.afterEvent("fill_rectangle")
 }
 
+func (h *HistoryScreen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
+	h.beforeEvent("copy_rectangle")
+	h.Screen.CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft)
+	h.afterEvent("copy_rectangle")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

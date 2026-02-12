@@ -162,6 +162,10 @@ func (d *DebugScreen) EraseRectangle(top, left, bottom, right int) {
 func (d *DebugScreen) FillRectangle(ch rune, top, left, bottom, right int) {
 	d.record("fill_rectangle", []interface{}{string(ch), top, left, bottom, right}, map[string]interface{}{})
 }
+
+func (d *DebugScreen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
+	d.record("copy_rectangle", []interface{}{srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

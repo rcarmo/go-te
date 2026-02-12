@@ -60,6 +60,7 @@ type EventHandler interface {
 	DeleteColumns(count int)
 	EraseRectangle(top, left, bottom, right int)
 	FillRectangle(ch rune, top, left, bottom, right int)
+	CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int)
 	SetMargins(top, bottom int)
 	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
@@ -628,6 +629,16 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		if st.csiIntermediate == '$' && final == 'x' {
 			ch := rune(defaultParam(params, 0, 0))
 			st.listener.FillRectangle(ch, defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1), defaultParam(params, 4, 1))
+			return
+		}
+		if st.csiIntermediate == '$' && final == 'v' {
+			srcTop := defaultParam(params, 0, 1)
+			srcLeft := defaultParam(params, 1, 1)
+			srcBottom := defaultParam(params, 2, 1)
+			srcRight := defaultParam(params, 3, 1)
+			dstTop := defaultParam(params, 5, 1)
+			dstLeft := defaultParam(params, 6, 1)
+			st.listener.CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft)
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'y' {
