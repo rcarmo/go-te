@@ -58,6 +58,10 @@ func NewScreen(cols, lines int) *Screen {
 }
 
 func (s *Screen) Reset() {
+	if s.SavedColumns != nil {
+		s.Resize(s.Lines, *s.SavedColumns)
+		s.SavedColumns = nil
+	}
 	s.Dirty = make(map[int]struct{})
 	s.markDirtyRange(0, s.Lines-1)
 	s.Buffer = makeBlankCells(s.Lines, s.Columns)
