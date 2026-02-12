@@ -57,6 +57,8 @@ type Screen struct {
 	titleHexInput    bool
 	titleHexOutput   bool
 	conformanceLevel int
+	titleStack       []string
+	iconStack        []string
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -102,6 +104,8 @@ func (s *Screen) Reset() {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 4
+	s.titleStack = nil
+	s.iconStack = nil
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -174,6 +178,8 @@ func (s *Screen) Resize(lines, columns int) {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 4
+	s.titleStack = nil
+	s.iconStack = nil
 }
 
 func (s *Screen) Display() []string {
@@ -1133,6 +1139,8 @@ func (s *Screen) SoftReset() {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 4
+	s.titleStack = nil
+	s.iconStack = nil
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1617,6 +1625,46 @@ func (s *Screen) WindowOp(params []int) {
 		s.WriteProcessInput(ControlOSC + "L" + s.IconName + ControlST)
 	case 21:
 		s.WriteProcessInput(ControlOSC + "l" + s.Title + ControlST)
+	case 22:
+		sub := 0
+		if len(params) > 1 {
+			sub = params[1]
+		}
+		switch sub {
+		case 0:
+			s.titleStack = append(s.titleStack, s.Title)
+			s.iconStack = append(s.iconStack, s.IconName)
+		case 1:
+			s.iconStack = append(s.iconStack, s.IconName)
+		case 2:
+			s.titleStack = append(s.titleStack, s.Title)
+		}
+	case 23:
+		sub := 0
+		if len(params) > 1 {
+			sub = params[1]
+		}
+		switch sub {
+		case 0:
+			if len(s.titleStack) > 0 {
+				s.Title = s.titleStack[len(s.titleStack)-1]
+				s.titleStack = s.titleStack[:len(s.titleStack)-1]
+			}
+			if len(s.iconStack) > 0 {
+				s.IconName = s.iconStack[len(s.iconStack)-1]
+				s.iconStack = s.iconStack[:len(s.iconStack)-1]
+			}
+		case 1:
+			if len(s.iconStack) > 0 {
+				s.IconName = s.iconStack[len(s.iconStack)-1]
+				s.iconStack = s.iconStack[:len(s.iconStack)-1]
+			}
+		case 2:
+			if len(s.titleStack) > 0 {
+				s.Title = s.titleStack[len(s.titleStack)-1]
+				s.titleStack = s.titleStack[:len(s.titleStack)-1]
+			}
+		}
 	}
 }
 
