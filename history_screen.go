@@ -455,6 +455,12 @@ func (h *HistoryScreen) ResetSpecialColor(index int, all bool) {
 	h.afterEvent("reset_special_color")
 }
 
+func (h *HistoryScreen) SetTitleMode(params []int, reset bool) {
+	h.beforeEvent("set_title_mode")
+	h.Screen.SetTitleMode(params, reset)
+	h.afterEvent("set_title_mode")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

@@ -83,6 +83,7 @@ type EventHandler interface {
 	SetSpecialColor(index int, value string)
 	QuerySpecialColor(index int)
 	ResetSpecialColor(index int, all bool)
+	SetTitleMode(params []int, reset bool)
 }
 
 type Stream struct {
@@ -684,6 +685,14 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 	case '\'':
 		st.listener.CursorToColumn(defaultParam(params, 0, 1))
 	default:
+		if st.csiPrefix == '>' && final == 't' {
+			st.listener.SetTitleMode(params, false)
+			return
+		}
+		if st.csiPrefix == '>' && final == 'T' {
+			st.listener.SetTitleMode(params, true)
+			return
+		}
 		if st.csiIntermediate == '$' && final == 'p' {
 			st.listener.ReportMode(defaultParam(params, 0, 0), st.private)
 			return

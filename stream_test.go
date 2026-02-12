@@ -87,6 +87,7 @@ type mockScreen struct {
 	setSpecialColor     func(int, string)
 	querySpecialColor   func(int)
 	resetSpecialColor   func(int, bool)
+	setTitleMode        func([]int, bool)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -429,6 +430,12 @@ func (m *mockScreen) QuerySpecialColor(index int) {
 func (m *mockScreen) ResetSpecialColor(index int, all bool) {
 	if m.resetSpecialColor != nil {
 		m.resetSpecialColor(index, all)
+	}
+}
+
+func (m *mockScreen) SetTitleMode(params []int, reset bool) {
+	if m.setTitleMode != nil {
+		m.setTitleMode(params, reset)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {

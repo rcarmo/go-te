@@ -206,6 +206,10 @@ func (d *DebugScreen) QuerySpecialColor(index int) {
 func (d *DebugScreen) ResetSpecialColor(index int, all bool) {
 	d.record("reset_special_color", []interface{}{index}, map[string]interface{}{"all": all})
 }
+
+func (d *DebugScreen) SetTitleMode(params []int, reset bool) {
+	d.record("set_title_mode", []interface{}{params}, map[string]interface{}{"reset": reset})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

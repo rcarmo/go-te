@@ -54,6 +54,8 @@ type Screen struct {
 	colorPalette     map[int]string
 	dynamicColors    map[int]string
 	specialColors    map[int]string
+	titleHexInput    bool
+	titleHexOutput   bool
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -96,6 +98,8 @@ func (s *Screen) Reset() {
 	s.colorPalette = make(map[int]string)
 	s.dynamicColors = make(map[int]string)
 	s.specialColors = make(map[int]string)
+	s.titleHexInput = false
+	s.titleHexOutput = false
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -161,6 +165,12 @@ func (s *Screen) Resize(lines, columns int) {
 	s.lineWrapped = make(map[int]bool)
 	s.wrapNext = false
 	s.savedModes = make(map[int]bool)
+	s.selectionData = make(map[string]string)
+	s.colorPalette = make(map[int]string)
+	s.dynamicColors = make(map[int]string)
+	s.specialColors = make(map[int]string)
+	s.titleHexInput = false
+	s.titleHexOutput = false
 }
 
 func (s *Screen) Display() []string {
@@ -268,11 +278,11 @@ loop:
 }
 
 func (s *Screen) SetTitle(param string) {
-	s.Title = param
+	s.Title = s.applyTitleModes(param)
 }
 
 func (s *Screen) SetIconName(param string) {
-	s.IconName = param
+	s.IconName = s.applyTitleModes(param)
 }
 
 func (s *Screen) CarriageReturn() {
@@ -1117,6 +1127,8 @@ func (s *Screen) SoftReset() {
 	s.colorPalette = make(map[int]string)
 	s.dynamicColors = make(map[int]string)
 	s.specialColors = make(map[int]string)
+	s.titleHexInput = false
+	s.titleHexOutput = false
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1508,6 +1520,72 @@ func normalizeHexComponent(component string) string {
 	}
 	full := (byteValue << 8) | byteValue
 	return fmt.Sprintf("%04x", full)
+}
+
+func (s *Screen) applyTitleModes(param string) string {
+	value := param
+	if s.titleHexInput {
+		decoded, ok := decodeHexString(param)
+		if ok {
+			value = decoded
+		}
+	}
+	if s.titleHexOutput {
+		value = encodeHexString(value)
+	}
+	return value
+}
+
+func decodeHexString(input string) (string, bool) {
+	if len(input)%2 != 0 {
+		return "", false
+	}
+	bytes := make([]byte, len(input)/2)
+	for i := 0; i < len(input); i += 2 {
+		b, err := strconv.ParseUint(input[i:i+2], 16, 8)
+		if err != nil {
+			return "", false
+		}
+		bytes[i/2] = byte(b)
+	}
+	return string(bytes), true
+}
+
+func encodeHexString(input string) string {
+	var b strings.Builder
+	for _, r := range []byte(input) {
+		fmt.Fprintf(&b, "%02x", r)
+	}
+	return b.String()
+}
+
+func (s *Screen) SetTitleMode(params []int, reset bool) {
+	if len(params) == 0 {
+		return
+	}
+	apply := func(param int) {
+		switch param {
+		case 0:
+			if reset {
+				s.titleHexInput = false
+			} else {
+				s.titleHexInput = true
+			}
+		case 2:
+			s.titleHexInput = false
+		case 1:
+			if reset {
+				s.titleHexOutput = false
+			} else {
+				s.titleHexOutput = true
+			}
+		case 3:
+			s.titleHexOutput = false
+		}
+	}
+	for _, param := range params {
+		apply(param)
+	}
 }
 
 func (s *Screen) Debug(_ ...interface{}) {
