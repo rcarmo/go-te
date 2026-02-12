@@ -1617,6 +1617,16 @@ func (s *Screen) WindowOp(params []int) {
 		return
 	}
 	switch params[0] {
+	case 11:
+		s.WriteProcessInput(ControlCSI + "1t")
+	case 13:
+		s.WriteProcessInput(ControlCSI + "3;0;0t")
+	case 14:
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf("4;%d;%dt", s.Lines, s.Columns))
+	case 15:
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf("5;%d;%dt", s.Lines, s.Columns))
+	case 16:
+		s.WriteProcessInput(ControlCSI + "6;0;0t")
 	case 18:
 		s.WriteProcessInput(ControlCSI + fmt.Sprintf("8;%d;%dt", s.Lines, s.Columns))
 	case 19:
