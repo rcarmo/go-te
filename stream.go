@@ -77,6 +77,7 @@ type EventHandler interface {
 	QuerySelectionData(selection string)
 	SetColor(index int, value string)
 	QueryColor(index int)
+	ResetColor(index int, all bool)
 }
 
 type Stream struct {
@@ -511,6 +512,14 @@ func (st *Stream) finishOSC() {
 				continue
 			}
 			st.listener.SetColor(idx, spec)
+		}
+	case "104":
+		if len(chunks) == 1 || chunks[1] == "" {
+			st.listener.ResetColor(0, true)
+			return
+		}
+		if idx, err := strconv.Atoi(chunks[1]); err == nil {
+			st.listener.ResetColor(idx, false)
 		}
 	}
 	st.current = ""

@@ -1392,6 +1392,17 @@ func (s *Screen) QueryColor(index int) {
 	s.WriteProcessInput(ControlOSC + fmt.Sprintf("4;%d;%s", index, value) + ControlST)
 }
 
+func (s *Screen) ResetColor(index int, all bool) {
+	if s.colorPalette == nil {
+		return
+	}
+	if all {
+		s.colorPalette = make(map[int]string)
+		return
+	}
+	delete(s.colorPalette, index)
+}
+
 func normalizeColorSpec(spec string) (string, bool) {
 	if strings.HasPrefix(spec, "rgb:") {
 		parts := strings.Split(spec[4:], "/")

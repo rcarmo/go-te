@@ -81,6 +81,7 @@ type mockScreen struct {
 	querySelectionData  func(string)
 	setColor            func(int, string)
 	queryColor          func(int)
+	resetColor          func(int, bool)
 	setMargins          func(int, int)
 	setLeftRightMargins func(int, int)
 	selectGraphic       func([]int, bool)
@@ -387,6 +388,12 @@ func (m *mockScreen) SetColor(index int, value string) {
 func (m *mockScreen) QueryColor(index int) {
 	if m.queryColor != nil {
 		m.queryColor(index)
+	}
+}
+
+func (m *mockScreen) ResetColor(index int, all bool) {
+	if m.resetColor != nil {
+		m.resetColor(index, all)
 	}
 }
 func (m *mockScreen) SetMargins(top, bottom int) {
