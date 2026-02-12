@@ -210,6 +210,14 @@ func (d *DebugScreen) ResetSpecialColor(index int, all bool) {
 func (d *DebugScreen) SetTitleMode(params []int, reset bool) {
 	d.record("set_title_mode", []interface{}{params}, map[string]interface{}{"reset": reset})
 }
+
+func (d *DebugScreen) SetConformance(level int, sevenBit int) {
+	d.record("set_conformance", []interface{}{level, sevenBit}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) WindowOp(params []int) {
+	d.record("window_op", []interface{}{params}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

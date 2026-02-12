@@ -461,6 +461,18 @@ func (h *HistoryScreen) SetTitleMode(params []int, reset bool) {
 	h.afterEvent("set_title_mode")
 }
 
+func (h *HistoryScreen) SetConformance(level int, sevenBit int) {
+	h.beforeEvent("set_conformance")
+	h.Screen.SetConformance(level, sevenBit)
+	h.afterEvent("set_conformance")
+}
+
+func (h *HistoryScreen) WindowOp(params []int) {
+	h.beforeEvent("window_op")
+	h.Screen.WindowOp(params)
+	h.afterEvent("window_op")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

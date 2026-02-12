@@ -56,6 +56,7 @@ type Screen struct {
 	specialColors    map[int]string
 	titleHexInput    bool
 	titleHexOutput   bool
+	conformanceLevel int
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -100,6 +101,7 @@ func (s *Screen) Reset() {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
+	s.conformanceLevel = 4
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -171,6 +173,7 @@ func (s *Screen) Resize(lines, columns int) {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
+	s.conformanceLevel = 4
 }
 
 func (s *Screen) Display() []string {
@@ -1129,6 +1132,7 @@ func (s *Screen) SoftReset() {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
+	s.conformanceLevel = 4
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1585,6 +1589,34 @@ func (s *Screen) SetTitleMode(params []int, reset bool) {
 	}
 	for _, param := range params {
 		apply(param)
+	}
+}
+
+func (s *Screen) SetConformance(level int, sevenBit int) {
+	if level >= 60 {
+		level -= 60
+	}
+	if level <= 0 {
+		return
+	}
+	s.Reset()
+	s.conformanceLevel = level
+	_ = sevenBit
+}
+
+func (s *Screen) WindowOp(params []int) {
+	if len(params) == 0 {
+		return
+	}
+	switch params[0] {
+	case 18:
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf("8;%d;%dt", s.Lines, s.Columns))
+	case 19:
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf("9;%d;%dt", s.Lines, s.Columns))
+	case 20:
+		s.WriteProcessInput(ControlOSC + "L" + s.IconName + ControlST)
+	case 21:
+		s.WriteProcessInput(ControlOSC + "l" + s.Title + ControlST)
 	}
 }
 
