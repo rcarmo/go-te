@@ -747,12 +747,13 @@ func (s *Screen) ScrollUp(count int) {
 	if count > bottom-top+1 {
 		count = bottom - top + 1
 	}
+	left, right := s.horizontalMargins()
 	s.markDirtyRange(top, bottom)
 	for i := 0; i < count; i++ {
 		for row := top; row < bottom; row++ {
-			s.Buffer[row] = s.Buffer[row+1]
+			s.copyRowSegment(row+1, row, left, right)
 		}
-		s.Buffer[bottom] = blankLine(s.Columns, s.defaultCell())
+		s.clearRowSegment(bottom, left, right)
 	}
 }
 
@@ -764,12 +765,13 @@ func (s *Screen) ScrollDown(count int) {
 	if count > bottom-top+1 {
 		count = bottom - top + 1
 	}
+	left, right := s.horizontalMargins()
 	s.markDirtyRange(top, bottom)
 	for i := 0; i < count; i++ {
 		for row := bottom; row > top; row-- {
-			s.Buffer[row] = s.Buffer[row-1]
+			s.copyRowSegment(row-1, row, left, right)
 		}
-		s.Buffer[top] = blankLine(s.Columns, s.defaultCell())
+		s.clearRowSegment(top, left, right)
 	}
 }
 
@@ -1303,6 +1305,30 @@ func (s *Screen) defaultAttr() Attr {
 
 func (s *Screen) defaultCell() Cell {
 	return Cell{Data: " ", Attr: s.defaultAttr()}
+}
+
+func (s *Screen) copyRowSegment(srcRow, dstRow, left, right int) {
+	if srcRow < 0 || srcRow >= s.Lines || dstRow < 0 || dstRow >= s.Lines {
+		return
+	}
+	for col := left; col <= right && col < s.Columns; col++ {
+		if col < 0 {
+			continue
+		}
+		s.Buffer[dstRow][col] = s.Buffer[srcRow][col]
+	}
+}
+
+func (s *Screen) clearRowSegment(row, left, right int) {
+	if row < 0 || row >= s.Lines {
+		return
+	}
+	for col := left; col <= right && col < s.Columns; col++ {
+		if col < 0 {
+			continue
+		}
+		s.Buffer[row][col] = s.defaultCell()
+	}
 }
 
 func (s *Screen) scrollRegion() (int, int) {
