@@ -30,3 +30,17 @@ func TestEsctest2DECSETDECOM(t *testing.T) {
 	screen.ResetMode([]int{69}, true)
 	assertCell(t, screen, 5, 5, "X")
 }
+
+func TestEsctest2DECSETDECAWM(t *testing.T) {
+	screen := NewScreen(5, 2)
+	screen.SetMode([]int{7}, true)
+	setCursor(screen, 5, 1)
+	screen.Draw("x")
+	screen.Draw("y")
+	assertCursor(t, screen, 2, 2)
+	screen.ResetMode([]int{7}, true)
+	setCursor(screen, 5, 1)
+	screen.Draw("x")
+	screen.Draw("y")
+	assertCursor(t, screen, 6, 1)
+}
