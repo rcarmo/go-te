@@ -3,6 +3,7 @@ package te
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -71,6 +72,8 @@ type EventHandler interface {
 	DefineCharset(code, mode string)
 	SetTitle(param string)
 	SetIconName(param string)
+	SetSelectionData(selection, data string)
+	QuerySelectionData(selection string)
 }
 
 type Stream struct {
@@ -467,21 +470,32 @@ func (st *Stream) finishOSC() {
 	if st.current == "" {
 		return
 	}
-	code, rest := st.current[0], ""
-	if len(st.current) > 1 {
-		rest = st.current[1:]
+	chunks := strings.Split(st.current, ";")
+	if len(chunks) == 0 {
+		return
 	}
-	if len(rest) > 0 && rest[0] == ';' {
-		rest = rest[1:]
-	}
-	switch code {
-	case '0':
+	option := chunks[0]
+	rest := strings.Join(chunks[1:], ";")
+	switch option {
+	case "0":
 		st.listener.SetIconName(rest)
 		st.listener.SetTitle(rest)
-	case '1':
+	case "1":
 		st.listener.SetIconName(rest)
-	case '2':
+	case "2":
 		st.listener.SetTitle(rest)
+	case "52":
+		selection := "s0"
+		if len(chunks) > 1 && chunks[1] != "" {
+			selection = chunks[1]
+		}
+		if len(chunks) > 2 {
+			if chunks[2] == "?" {
+				st.listener.QuerySelectionData(selection)
+			} else {
+				st.listener.SetSelectionData(selection, chunks[2])
+			}
+		}
 	}
 	st.current = ""
 }

@@ -166,6 +166,14 @@ func (d *DebugScreen) FillRectangle(ch rune, top, left, bottom, right int) {
 func (d *DebugScreen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
 	d.record("copy_rectangle", []interface{}{srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft}, map[string]interface{}{})
 }
+
+func (d *DebugScreen) SetSelectionData(selection, data string) {
+	d.record("set_selection_data", []interface{}{selection, data}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) QuerySelectionData(selection string) {
+	d.record("query_selection_data", []interface{}{selection}, map[string]interface{}{})
+}
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
 }

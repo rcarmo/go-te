@@ -395,6 +395,18 @@ func (h *HistoryScreen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstT
 	h.afterEvent("copy_rectangle")
 }
 
+func (h *HistoryScreen) SetSelectionData(selection, data string) {
+	h.beforeEvent("set_selection_data")
+	h.Screen.SetSelectionData(selection, data)
+	h.afterEvent("set_selection_data")
+}
+
+func (h *HistoryScreen) QuerySelectionData(selection string) {
+	h.beforeEvent("query_selection_data")
+	h.Screen.QuerySelectionData(selection)
+	h.afterEvent("query_selection_data")
+}
+
 func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)

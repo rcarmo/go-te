@@ -49,6 +49,7 @@ type Screen struct {
 	lineWrapped       map[int]bool
 	wrapNext          bool
 	savedModes        map[int]bool
+	selectionData    map[string]string
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -87,6 +88,7 @@ func (s *Screen) Reset() {
 	s.lineWrapped = make(map[int]bool)
 	s.wrapNext = false
 	s.savedModes = make(map[int]bool)
+	s.selectionData = make(map[string]string)
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -1104,6 +1106,7 @@ func (s *Screen) SoftReset() {
 	s.Charset = 0
 	s.Savepoints = nil
 	s.savedModes = make(map[int]bool)
+	s.selectionData = make(map[string]string)
 }
 
 func (s *Screen) SaveModes(modes []int) {
@@ -1339,6 +1342,29 @@ func (s *Screen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dst
 		}
 		s.Dirty[dstRow] = struct{}{}
 	}
+}
+
+func (s *Screen) SetSelectionData(selection, data string) {
+	if selection == "" {
+		selection = "s0"
+	}
+	if s.selectionData == nil {
+		s.selectionData = make(map[string]string)
+	}
+	s.selectionData[selection] = data
+}
+
+func (s *Screen) QuerySelectionData(selection string) {
+	if selection == "" {
+		selection = "s0"
+	}
+	data := ""
+	if s.selectionData != nil {
+		if value, ok := s.selectionData[selection]; ok {
+			data = value
+		}
+	}
+	s.WriteProcessInput(ControlOSC + "52;" + selection + ";" + data + ControlST)
 }
 
 func (s *Screen) Debug(_ ...interface{}) {
