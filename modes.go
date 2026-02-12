@@ -9,4 +9,5 @@ const (
 	ModeDECOM   = 6 << 5
 	ModeDECAWM  = 7 << 5
 	ModeDECCOLM = 3 << 5
+	ModeDECLRMM = 69 << 5
 )

@@ -2,6 +2,7 @@ package te
 
 import (
 	"errors"
+	"fmt"
 	"unicode/utf8"
 )
 
@@ -32,6 +33,10 @@ type EventHandler interface {
 	CursorUp1(count int)
 	CursorToColumn(column int)
 	CursorPosition(line, col int)
+	CursorBackTab(count int)
+	ScrollUp(count int)
+	ScrollDown(count int)
+	RepeatLast(count int)
 	EraseInDisplay(how int, private bool, rest ...int)
 	EraseInLine(how int, private bool)
 	InsertLines(count int)
@@ -42,6 +47,7 @@ type EventHandler interface {
 	CursorToLine(line int)
 	ReportDeviceStatus(mode int)
 	SetMargins(top, bottom int)
+	SetLeftRightMargins(left, right int)
 	SelectGraphicRendition(attrs []int, private bool)
 	Draw(data string)
 	Debug(params ...interface{})
@@ -73,6 +79,10 @@ const (
 	stateCSI
 	stateSharp
 	stateOSC
+	stateDCS
+	stateAPC
+	statePM
+	stateSOS
 	stateCharset
 	stateEscapePercent
 )
@@ -112,7 +122,7 @@ func (st *Stream) Feed(data string) (err error) {
 			st.resetCSI()
 			st.oscEsc = false
 			st.skipNext = false
-			err = errors.New("handler panic")
+			err = fmt.Errorf("handler panic: %v", r)
 		}
 	}()
 
@@ -176,6 +186,8 @@ func (st *Stream) feedRune(ch rune) error {
 		return st.handleCSI(ch)
 	case stateOSC:
 		return st.handleOSC(ch)
+	case stateDCS, stateAPC, statePM, stateSOS:
+		return st.handleString(ch)
 	default:
 		st.state = stateGround
 	}
@@ -228,6 +240,18 @@ func (st *Stream) handleEscape(ch rune) error {
 	case ']':
 		st.state = stateOSC
 		st.current = ""
+		st.oscEsc = false
+	case 'P':
+		st.state = stateDCS
+		st.oscEsc = false
+	case '_':
+		st.state = stateAPC
+		st.oscEsc = false
+	case '^':
+		st.state = statePM
+		st.oscEsc = false
+	case 'X':
+		st.state = stateSOS
 		st.oscEsc = false
 	case '#':
 		st.state = stateSharp
@@ -320,6 +344,25 @@ func (st *Stream) handleOSC(ch rune) error {
 	return nil
 }
 
+func (st *Stream) handleString(ch rune) error {
+	if st.oscEsc {
+		st.oscEsc = false
+		if ch == '\\' {
+			st.state = stateGround
+			return nil
+		}
+		return nil
+	}
+	if ch == '\x07' || ch == '\x9c' {
+		st.state = stateGround
+		return nil
+	}
+	if ch == '\x1b' {
+		st.oscEsc = true
+	}
+	return nil
+}
+
 func (st *Stream) finishOSC() {
 	if st.current == "" {
 		return
@@ -396,6 +439,14 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		st.listener.DeleteCharacters(defaultParam(params, 0, 1))
 	case 'X':
 		st.listener.EraseCharacters(defaultParam(params, 0, 1))
+	case 'Z':
+		st.listener.CursorBackTab(defaultParam(params, 0, 1))
+	case 'S':
+		st.listener.ScrollUp(defaultParam(params, 0, 1))
+	case 'T':
+		st.listener.ScrollDown(defaultParam(params, 0, 1))
+	case 'b':
+		st.listener.RepeatLast(defaultParam(params, 0, 1))
 	case 'a':
 		st.listener.CursorForward(defaultParam(params, 0, 1))
 	case 'c':
@@ -425,6 +476,14 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			bottom = params[1]
 		}
 		st.listener.SetMargins(top, bottom)
+	case 's':
+		if len(params) >= 2 {
+			st.listener.SetLeftRightMargins(defaultParam(params, 0, 0), defaultParam(params, 1, 0))
+			return
+		}
+		st.listener.SaveCursor()
+	case 'u':
+		st.listener.RestoreCursor()
 	case '\'':
 		st.listener.CursorToColumn(defaultParam(params, 0, 1))
 	default:

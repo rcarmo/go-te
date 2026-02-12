@@ -72,6 +72,18 @@ func (d *DebugScreen) CursorToColumn(column int) {
 func (d *DebugScreen) CursorPosition(line, col int) {
 	d.record("cursor_position", []interface{}{line, col}, map[string]interface{}{})
 }
+func (d *DebugScreen) CursorBackTab(count int) {
+	d.record("cursor_back_tab", []interface{}{count}, map[string]interface{}{})
+}
+func (d *DebugScreen) ScrollUp(count int) {
+	d.record("scroll_up", []interface{}{count}, map[string]interface{}{})
+}
+func (d *DebugScreen) ScrollDown(count int) {
+	d.record("scroll_down", []interface{}{count}, map[string]interface{}{})
+}
+func (d *DebugScreen) RepeatLast(count int) {
+	d.record("repeat_last", []interface{}{count}, map[string]interface{}{})
+}
 func (d *DebugScreen) EraseInDisplay(how int, private bool, _ ...int) {
 	d.record("erase_in_display", []interface{}{how}, map[string]interface{}{"private": private})
 }
@@ -101,6 +113,9 @@ func (d *DebugScreen) ReportDeviceStatus(mode int) {
 }
 func (d *DebugScreen) SetMargins(top, bottom int) {
 	d.record("set_margins", []interface{}{top, bottom}, map[string]interface{}{})
+}
+func (d *DebugScreen) SetLeftRightMargins(left, right int) {
+	d.record("set_left_right_margins", []interface{}{left, right}, map[string]interface{}{})
 }
 func (d *DebugScreen) SelectGraphicRendition(attrs []int, private bool) {
 	args := make([]interface{}, len(attrs))

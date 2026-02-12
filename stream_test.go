@@ -25,48 +25,53 @@ func (a *argCheck) Call(args ...interface{}) {
 }
 
 type mockScreen struct {
-	bell               func()
-	backspace          func()
-	tab                func()
-	linefeed           func()
-	carriageReturn     func()
-	shiftOut           func()
-	shiftIn            func()
-	reset              func()
-	index              func()
-	reverseIndex       func()
-	setTabStop         func()
-	clearTabStop       func(int)
-	saveCursor         func()
-	restoreCursor      func()
-	alignmentDisplay   func()
-	insertCharacters   func(int)
-	cursorUp           func(int)
-	cursorDown         func(int)
-	cursorForward      func(int)
-	cursorBack         func(int)
-	cursorDown1        func(int)
-	cursorUp1          func(int)
-	cursorToColumn     func(int)
-	cursorPosition     func(int, int)
-	eraseInDisplay     func(int, bool, ...int)
-	eraseInLine        func(int, bool)
-	insertLines        func(int)
-	deleteLines        func(int)
-	deleteCharacters   func(int)
-	eraseCharacters    func(int)
-	reportDeviceAttrs  func(int, bool)
-	cursorToLine       func(int)
-	reportDeviceStatus func(int)
-	setMargins         func(int, int)
-	selectGraphic      func([]int, bool)
-	draw               func(string)
-	debug              func(...interface{})
-	setMode            func([]int, bool)
-	resetMode          func([]int, bool)
-	defineCharset      func(string, string)
-	setTitle           func(string)
-	setIconName        func(string)
+	bell                func()
+	backspace           func()
+	tab                 func()
+	linefeed            func()
+	carriageReturn      func()
+	shiftOut            func()
+	shiftIn             func()
+	reset               func()
+	index               func()
+	reverseIndex        func()
+	setTabStop          func()
+	clearTabStop        func(int)
+	saveCursor          func()
+	restoreCursor       func()
+	alignmentDisplay    func()
+	insertCharacters    func(int)
+	cursorUp            func(int)
+	cursorDown          func(int)
+	cursorForward       func(int)
+	cursorBack          func(int)
+	cursorDown1         func(int)
+	cursorUp1           func(int)
+	cursorToColumn      func(int)
+	cursorPosition      func(int, int)
+	cursorBackTab       func(int)
+	scrollUp            func(int)
+	scrollDown          func(int)
+	repeatLast          func(int)
+	eraseInDisplay      func(int, bool, ...int)
+	eraseInLine         func(int, bool)
+	insertLines         func(int)
+	deleteLines         func(int)
+	deleteCharacters    func(int)
+	eraseCharacters     func(int)
+	reportDeviceAttrs   func(int, bool)
+	cursorToLine        func(int)
+	reportDeviceStatus  func(int)
+	setMargins          func(int, int)
+	setLeftRightMargins func(int, int)
+	selectGraphic       func([]int, bool)
+	draw                func(string)
+	debug               func(...interface{})
+	setMode             func([]int, bool)
+	resetMode           func([]int, bool)
+	defineCharset       func(string, string)
+	setTitle            func(string)
+	setIconName         func(string)
 }
 
 func (m *mockScreen) Bell() {
@@ -189,6 +194,26 @@ func (m *mockScreen) CursorPosition(line, col int) {
 		m.cursorPosition(line, col)
 	}
 }
+func (m *mockScreen) CursorBackTab(count int) {
+	if m.cursorBackTab != nil {
+		m.cursorBackTab(count)
+	}
+}
+func (m *mockScreen) ScrollUp(count int) {
+	if m.scrollUp != nil {
+		m.scrollUp(count)
+	}
+}
+func (m *mockScreen) ScrollDown(count int) {
+	if m.scrollDown != nil {
+		m.scrollDown(count)
+	}
+}
+func (m *mockScreen) RepeatLast(count int) {
+	if m.repeatLast != nil {
+		m.repeatLast(count)
+	}
+}
 func (m *mockScreen) EraseInDisplay(how int, private bool, rest ...int) {
 	if m.eraseInDisplay != nil {
 		m.eraseInDisplay(how, private, rest...)
@@ -237,6 +262,11 @@ func (m *mockScreen) ReportDeviceStatus(mode int) {
 func (m *mockScreen) SetMargins(top, bottom int) {
 	if m.setMargins != nil {
 		m.setMargins(top, bottom)
+	}
+}
+func (m *mockScreen) SetLeftRightMargins(left, right int) {
+	if m.setLeftRightMargins != nil {
+		m.setLeftRightMargins(left, right)
 	}
 }
 func (m *mockScreen) SelectGraphicRendition(attrs []int, private bool) {
@@ -343,7 +373,7 @@ func TestUnknownCSISequences(t *testing.T) {
 	args := argCheck{}
 	screen := &mockScreen{debug: args.Call}
 	stream := NewStream(screen, false)
-	if err := stream.Feed(ControlCSI + "6;Z"); err != nil {
+	if err := stream.Feed(ControlCSI + "6;z"); err != nil {
 		t.Fatalf("feed: %v", err)
 	}
 	if args.count != 1 {

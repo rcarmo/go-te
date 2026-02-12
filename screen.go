@@ -42,6 +42,9 @@ type Screen struct {
 	Savepoints        []Savepoint
 	SavedColumns      *int
 	WriteProcessInput func(string)
+	lastDrawn         string
+	leftMargin        int
+	rightMargin       int
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -71,6 +74,8 @@ func (s *Screen) Reset() {
 	}
 	s.Cursor = Cursor{Row: 0, Col: 0, Attr: s.defaultAttr(), Hidden: false}
 	s.SavedColumns = nil
+	s.leftMargin = 0
+	s.rightMargin = s.Columns - 1
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -131,6 +136,8 @@ func (s *Screen) Resize(lines, columns int) {
 	s.Lines = lines
 	s.Columns = columns
 	s.SetMargins(0, 0)
+	s.leftMargin = 0
+	s.rightMargin = s.Columns - 1
 }
 
 func (s *Screen) Display() []string {
@@ -177,8 +184,12 @@ loop:
 	for graphemes.Next() {
 		cluster := graphemes.Str()
 		width := runewidth.StringWidth(cluster)
+		limit := s.Columns
+		if s.isModeSet(ModeDECLRMM) {
+			limit = s.rightMargin + 1
+		}
 
-		if s.Cursor.Col == s.Columns {
+		if s.Cursor.Col == limit {
 			if s.isModeSet(ModeDECAWM) {
 				s.Dirty[s.Cursor.Row] = struct{}{}
 				s.CarriageReturn()
@@ -218,9 +229,10 @@ loop:
 		}
 
 		if width > 0 {
+			s.lastDrawn = cluster
 			s.Cursor.Col += width
-			if s.Cursor.Col > s.Columns {
-				s.Cursor.Col = s.Columns
+			if s.Cursor.Col > limit {
+				s.Cursor.Col = limit
 			}
 		}
 	}
@@ -365,14 +377,18 @@ func (s *Screen) InsertCharacters(count int) {
 	if count <= 0 {
 		count = 1
 	}
+	left, right := s.horizontalMargins()
+	if s.Cursor.Col < left || s.Cursor.Col > right {
+		return
+	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
-	for col := s.Columns - 1; col >= s.Cursor.Col; col-- {
-		if col+count < s.Columns {
+	for col := right; col >= s.Cursor.Col; col-- {
+		if col+count <= right {
 			line[col+count] = line[col]
 		}
 	}
-	for col := s.Cursor.Col; col < s.Cursor.Col+count && col < s.Columns; col++ {
+	for col := s.Cursor.Col; col < s.Cursor.Col+count && col <= right; col++ {
 		line[col] = s.defaultCell()
 	}
 }
@@ -381,10 +397,14 @@ func (s *Screen) DeleteCharacters(count int) {
 	if count <= 0 {
 		count = 1
 	}
+	left, right := s.horizontalMargins()
+	if s.Cursor.Col < left || s.Cursor.Col > right {
+		return
+	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
-	for col := s.Cursor.Col; col < s.Columns; col++ {
-		if col+count < s.Columns {
+	for col := s.Cursor.Col; col <= right; col++ {
+		if col+count <= right {
 			line[col] = line[col+count]
 		} else {
 			line[col] = s.defaultCell()
@@ -396,9 +416,14 @@ func (s *Screen) EraseCharacters(count int) {
 	if count <= 0 {
 		count = 1
 	}
+	left, right := s.horizontalMargins()
+	if s.Cursor.Col < left || s.Cursor.Col > right {
+		return
+	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
-	for col := s.Cursor.Col; col < s.Columns && col < s.Cursor.Col+count; col++ {
+	end := minInt(s.Cursor.Col+count-1, right)
+	for col := s.Cursor.Col; col <= end; col++ {
 		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
 	}
 }
@@ -406,17 +431,18 @@ func (s *Screen) EraseCharacters(count int) {
 func (s *Screen) EraseInLine(how int, private bool) {
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
+	left, right := s.horizontalMargins()
 	var start, end int
 	switch how {
 	case 0:
-		start = s.Cursor.Col
-		end = s.Columns
+		start = maxInt(s.Cursor.Col, left)
+		end = right + 1
 	case 1:
-		start = 0
-		end = s.Cursor.Col + 1
+		start = left
+		end = minInt(s.Cursor.Col, right) + 1
 	case 2:
-		start = 0
-		end = s.Columns
+		start = left
+		end = right + 1
 	}
 	for col := start; col < end; col++ {
 		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
@@ -506,12 +532,74 @@ func (s *Screen) CursorBack(count int) {
 	s.ensureHB()
 }
 
+func (s *Screen) CursorBackTab(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	left, _ := s.horizontalMargins()
+	for i := 0; i < count; i++ {
+		prev := left
+		for stop := range s.TabStops {
+			if stop < s.Cursor.Col && stop > prev {
+				prev = stop
+			}
+		}
+		s.Cursor.Col = prev
+	}
+}
+
 func (s *Screen) CursorForward(count int) {
 	if count <= 0 {
 		count = 1
 	}
 	s.Cursor.Col += count
 	s.ensureHB()
+}
+
+func (s *Screen) ScrollUp(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	if count > bottom-top+1 {
+		count = bottom - top + 1
+	}
+	s.markDirtyRange(top, bottom)
+	for i := 0; i < count; i++ {
+		for row := top; row < bottom; row++ {
+			s.Buffer[row] = s.Buffer[row+1]
+		}
+		s.Buffer[bottom] = blankLine(s.Columns, s.defaultCell())
+	}
+}
+
+func (s *Screen) ScrollDown(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	top, bottom := s.scrollRegion()
+	if count > bottom-top+1 {
+		count = bottom - top + 1
+	}
+	s.markDirtyRange(top, bottom)
+	for i := 0; i < count; i++ {
+		for row := bottom; row > top; row-- {
+			s.Buffer[row] = s.Buffer[row-1]
+		}
+		s.Buffer[top] = blankLine(s.Columns, s.defaultCell())
+	}
+}
+
+func (s *Screen) RepeatLast(count int) {
+	if count <= 0 {
+		count = 1
+	}
+	if s.lastDrawn == "" {
+		return
+	}
+	for i := 0; i < count; i++ {
+		s.Draw(s.lastDrawn)
+	}
 }
 
 func (s *Screen) CursorPosition(line, column int) {
@@ -733,6 +821,28 @@ func (s *Screen) SetMargins(top, bottom int) {
 	}
 }
 
+func (s *Screen) SetLeftRightMargins(left, right int) {
+	if (left == 0 || left == -1) && right == 0 {
+		s.leftMargin = 0
+		s.rightMargin = s.Columns - 1
+		s.CursorPosition(0, 0)
+		return
+	}
+	if left == 0 {
+		left = 1
+	}
+	if right == 0 {
+		right = s.Columns
+	}
+	left = maxInt(1, minInt(left, s.Columns))
+	right = maxInt(1, minInt(right, s.Columns))
+	if right-left >= 1 {
+		s.leftMargin = left - 1
+		s.rightMargin = right - 1
+		s.CursorPosition(0, 0)
+	}
+}
+
 func (s *Screen) SetMode(modes []int, private bool) {
 	for _, mode := range modes {
 		s.applySetMode(mode, private)
@@ -781,6 +891,12 @@ func (s *Screen) applySetMode(mode int, private bool) {
 	if mode == ModeDECTCEM {
 		s.Cursor.Hidden = false
 	}
+
+	if mode == ModeDECLRMM {
+		s.leftMargin = 0
+		s.rightMargin = s.Columns - 1
+		s.CursorPosition(0, 0)
+	}
 }
 
 func (s *Screen) applyResetMode(mode int, private bool) {
@@ -817,6 +933,12 @@ func (s *Screen) applyResetMode(mode int, private bool) {
 	if mode == ModeDECTCEM {
 		s.Cursor.Hidden = true
 	}
+
+	if mode == ModeDECLRMM {
+		s.leftMargin = 0
+		s.rightMargin = s.Columns - 1
+		s.CursorPosition(0, 0)
+	}
 }
 
 func (s *Screen) defaultAttr() Attr {
@@ -839,12 +961,20 @@ func (s *Screen) scrollRegion() (int, int) {
 	return 0, s.Lines - 1
 }
 
-func (s *Screen) ensureHB() {
-	if s.Cursor.Col < 0 {
-		s.Cursor.Col = 0
+func (s *Screen) horizontalMargins() (int, int) {
+	if s.isModeSet(ModeDECLRMM) {
+		return s.leftMargin, s.rightMargin
 	}
-	if s.Cursor.Col >= s.Columns {
-		s.Cursor.Col = s.Columns - 1
+	return 0, s.Columns - 1
+}
+
+func (s *Screen) ensureHB() {
+	left, right := s.horizontalMargins()
+	if s.Cursor.Col < left {
+		s.Cursor.Col = left
+	}
+	if s.Cursor.Col > right {
+		s.Cursor.Col = right
 	}
 }
 

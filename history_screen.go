@@ -275,6 +275,30 @@ func (h *HistoryScreen) CursorToLine(line int) {
 	h.afterEvent("cursor_to_line")
 }
 
+func (h *HistoryScreen) CursorBackTab(count int) {
+	h.beforeEvent("cursor_back_tab")
+	h.Screen.CursorBackTab(count)
+	h.afterEvent("cursor_back_tab")
+}
+
+func (h *HistoryScreen) ScrollUp(count int) {
+	h.beforeEvent("scroll_up")
+	h.Screen.ScrollUp(count)
+	h.afterEvent("scroll_up")
+}
+
+func (h *HistoryScreen) ScrollDown(count int) {
+	h.beforeEvent("scroll_down")
+	h.Screen.ScrollDown(count)
+	h.afterEvent("scroll_down")
+}
+
+func (h *HistoryScreen) RepeatLast(count int) {
+	h.beforeEvent("repeat_last")
+	h.Screen.RepeatLast(count)
+	h.afterEvent("repeat_last")
+}
+
 func (h *HistoryScreen) ReportDeviceStatus(mode int) {
 	h.beforeEvent("report_device_status")
 	h.Screen.ReportDeviceStatus(mode)
@@ -285,6 +309,12 @@ func (h *HistoryScreen) SetMargins(top, bottom int) {
 	h.beforeEvent("set_margins")
 	h.Screen.SetMargins(top, bottom)
 	h.afterEvent("set_margins")
+}
+
+func (h *HistoryScreen) SetLeftRightMargins(left, right int) {
+	h.beforeEvent("set_left_right_margins")
+	h.Screen.SetLeftRightMargins(left, right)
+	h.afterEvent("set_left_right_margins")
 }
 
 func (h *HistoryScreen) SelectGraphicRendition(attrs []int, private bool) {

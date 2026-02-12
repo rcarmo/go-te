@@ -64,7 +64,7 @@ TUI rendering, and terminal playback without a real PTY.
 - `HistoryScreen`: retains scrollback in a bounded ring buffer.
 - `DebugScreen`: logs received actions and state changes for diagnostics.
 
-## Public API (Proposed)
+## Public API (Current)
 
 ### Core Types
 
@@ -72,26 +72,30 @@ TUI rendering, and terminal playback without a real PTY.
 package te
 
 type Color struct {
-  Mode  ColorMode // Default, ANSI16, ANSI256
+  Mode  ColorMode // Default, ANSI16, ANSI256, TrueColor
   Index uint8
+  Name  string
 }
 
 type Attr struct {
-  Fg, Bg  Color
-  Bold    bool
-  Underline bool
-  Blink   bool
-  Reverse bool
-  Conceal bool
+  Fg, Bg       Color
+  Bold         bool
+  Italics      bool
+  Underline    bool
+  Strikethrough bool
+  Reverse      bool
+  Blink        bool
+  Conceal      bool
 }
 
 type Cell struct {
-  Ch   rune
+  Data string
   Attr Attr
 }
 
 type Cursor struct {
   Row, Col int
+  Attr     Attr
   Hidden   bool
 }
 ```
@@ -100,56 +104,49 @@ type Cursor struct {
 
 ```
 func NewScreen(cols, lines int) *Screen
-func (s *Screen) Resize(cols, lines int)
+func (s *Screen) Resize(lines, cols int)
 func (s *Screen) Reset()
 func (s *Screen) Display() []string
-func (s *Screen) Lines() [][]Cell
-func (s *Screen) Cursor() Cursor
-func (s *Screen) SetTabStop(col int)
-func (s *Screen) ClearTabStop(col int)
+func (s *Screen) LinesCells() [][]Cell
 ```
 
 - `Display()` returns the visible screen as `[]string`, one entry per line.
-- `Lines()` exposes the full cell matrix for renderers needing attributes.
+- `LinesCells()` exposes the full cell matrix for renderers needing attributes.
+- `Screen` exposes fields for buffer, modes, cursor, margins, tab stops, title, and icon name.
 
 ### HistoryScreen
 
 ```
 func NewHistoryScreen(cols, lines, history int) *HistoryScreen
+func NewHistoryScreenWithRatio(cols, lines, history int, ratio float64) *HistoryScreen
 func (s *HistoryScreen) History() [][]Cell
 func (s *HistoryScreen) Scrollback() int
 ```
-
-- `history` is the maximum number of lines retained.
-- History stores full cells with attributes.
 
 ### DiffScreen
 
 ```
 func NewDiffScreen(cols, lines int) *DiffScreen
-func (s *DiffScreen) DirtyLines() []int
-func (s *DiffScreen) ClearDirty()
 ```
-
-- Dirty lines are tracked on any line modification or scroll.
 
 ### Stream
 
 ```
-func NewStream(screen ScreenLike, strict bool) *Stream
-func (st *Stream) Attach(screen ScreenLike)
-func (st *Stream) FeedString(data string) error
+func NewStream(screen EventHandler, strict bool) *Stream
+func (st *Stream) Attach(screen EventHandler)
+func (st *Stream) Detach(screen EventHandler)
+func (st *Stream) Feed(data string) error
 ```
 
 ### ByteStream
 
 ```
-func NewByteStream(screen ScreenLike, strict bool) *ByteStream
+func NewByteStream(screen EventHandler, strict bool) *ByteStream
 func (st *ByteStream) Feed(data []byte) error
-func (st *ByteStream) SetEncoding(name string) // default: UTF-8
+func (st *ByteStream) SelectOtherCharset(code string)
 ```
 
-`ScreenLike` is an interface implemented by Screen/HistoryScreen/DiffScreen/DebugScreen.
+`EventHandler` is implemented by Screen/HistoryScreen/DiffScreen/DebugScreen.
 
 ## Control/CSI Coverage (Minimum)
 
@@ -176,6 +173,7 @@ func (st *ByteStream) SetEncoding(name string) // default: UTF-8
 
 ## Testing Strategy
 
-- Port pyte tutorial examples as golden tests for Screen state.
-- Add sequence fixtures for cursor movement, SGR, erase, insert/delete, and scrolling.
-- Verify HistoryScreen and DiffScreen outputs match pyte for identical inputs.
+- Port the full pyte test suite as Go tests (screen/stream/history/diff).
+- Validate captured fixtures from `pyte/tests/captured` via ByteStream playback.
+- Add esctest2-derived tests to exercise full escape/CSI coverage (VT100/VT220/xterm extensions).
+- Keep parity tests for cursor movement, SGR, erase, insert/delete, scrolling, and history pagination.
