@@ -626,6 +626,10 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			st.listener.EraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
 			return
 		}
+		if st.csiIntermediate == '$' && final == '{' {
+			st.listener.EraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
+			return
+		}
 		if st.csiIntermediate == '$' && final == 'x' {
 			ch := rune(defaultParam(params, 0, 0))
 			st.listener.FillRectangle(ch, defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1), defaultParam(params, 4, 1))
