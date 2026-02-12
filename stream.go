@@ -78,6 +78,8 @@ type EventHandler interface {
 	SetColor(index int, value string)
 	QueryColor(index int)
 	ResetColor(index int, all bool)
+	SetDynamicColor(index int, value string)
+	QueryDynamicColor(index int)
 }
 
 type Stream struct {
@@ -520,6 +522,19 @@ func (st *Stream) finishOSC() {
 		}
 		if idx, err := strconv.Atoi(chunks[1]); err == nil {
 			st.listener.ResetColor(idx, false)
+		}
+	case "10", "11":
+		idx, err := strconv.Atoi(option)
+		if err != nil {
+			break
+		}
+		if len(chunks) > 1 {
+			spec := chunks[1]
+			if spec == "?" {
+				st.listener.QueryDynamicColor(idx)
+				break
+			}
+			st.listener.SetDynamicColor(idx, spec)
 		}
 	}
 	st.current = ""
