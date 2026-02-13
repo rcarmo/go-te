@@ -33,6 +33,8 @@ const (
 	esctestModeReverseWrapExtend = 1045
 	esctestModeAllow80To132      = 40
 	esctestModeAltBuf            = 47
+	esctestModeOptAltBuf         = 1047
+	esctestModeOptAltBufCursor   = 1049
 	esctestModeSaveRestoreCursor = 1048
 	esctestModeDECRLM            = 34
 	esctestXtermReverseWrap      = 383
@@ -441,6 +443,9 @@ func esctestJoinParams(params ...int) string {
 func esctestGetCursorPosition(screen *Screen) esctestPoint {
 	x := screen.Cursor.Col + 1
 	y := screen.Cursor.Row + 1
+	if x > screen.Columns {
+		x = screen.Columns
+	}
 	if screen.isModeSet(ModeDECOM) && screen.Margins != nil {
 		y -= screen.Margins.Top
 	}
