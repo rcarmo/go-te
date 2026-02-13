@@ -63,6 +63,10 @@ func (d *DebugScreen) ClearTabStop(how ...int) {
 }
 func (d *DebugScreen) SaveCursor()    { d.record("save_cursor", nil, map[string]interface{}{}) }
 func (d *DebugScreen) RestoreCursor() { d.record("restore_cursor", nil, map[string]interface{}{}) }
+func (d *DebugScreen) SaveCursorDEC() { d.record("save_cursor_dec", nil, map[string]interface{}{}) }
+func (d *DebugScreen) RestoreCursorDEC() {
+	d.record("restore_cursor_dec", nil, map[string]interface{}{})
+}
 func (d *DebugScreen) AlignmentDisplay() {
 	d.record("alignment_display", nil, map[string]interface{}{})
 }
@@ -181,6 +185,10 @@ func (d *DebugScreen) DeleteColumns(count int) {
 
 func (d *DebugScreen) EraseRectangle(top, left, bottom, right int) {
 	d.record("erase_rectangle", []interface{}{top, left, bottom, right}, map[string]interface{}{})
+}
+
+func (d *DebugScreen) SelectiveEraseRectangle(top, left, bottom, right int) {
+	d.record("selective_erase_rectangle", []interface{}{top, left, bottom, right}, map[string]interface{}{})
 }
 
 func (d *DebugScreen) FillRectangle(ch rune, top, left, bottom, right int) {

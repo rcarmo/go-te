@@ -227,6 +227,10 @@ func esctestDECSED(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s?%sJ", ControlCSI, esctestJoinParams(params...)))
 }
 
+func esctestDECSERA(t *testing.T, stream *Stream, top, left, bottom, right int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d;%d;%d${", ControlCSI, top, left, bottom, right))
+}
+
 func esctestChangeWindowTitle(t *testing.T, stream *Stream, title string) {
 	esctestWrite(t, stream, fmt.Sprintf("%s2;%s%s", ControlOSC, title, ControlST))
 }

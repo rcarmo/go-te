@@ -29,6 +29,8 @@ type EventHandler interface {
 	ClearTabStop(how ...int)
 	SaveCursor()
 	RestoreCursor()
+	SaveCursorDEC()
+	RestoreCursorDEC()
 	AlignmentDisplay()
 	InsertCharacters(count ...int)
 	CursorUp(count ...int)
@@ -64,6 +66,7 @@ type EventHandler interface {
 	InsertColumns(count int)
 	DeleteColumns(count int)
 	EraseRectangle(top, left, bottom, right int)
+	SelectiveEraseRectangle(top, left, bottom, right int)
 	FillRectangle(ch rune, top, left, bottom, right int)
 	CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int)
 	SetMargins(params ...int)
@@ -383,9 +386,9 @@ func (st *Stream) handleEscape(ch rune) error {
 	case 'W':
 		st.listener.EndProtectedArea()
 	case '7':
-		st.listener.SaveCursor()
+		st.listener.SaveCursorDEC()
 	case '8':
-		st.listener.RestoreCursor()
+		st.listener.RestoreCursorDEC()
 	case '6':
 		st.listener.BackIndex()
 	case '9':
@@ -754,9 +757,9 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 				return
 			}
 		}
-		st.listener.SaveCursor()
+		st.listener.SaveCursorDEC()
 	case 'u':
-		st.listener.RestoreCursor()
+		st.listener.RestoreCursorDEC()
 	case '\'':
 		st.listener.CursorToColumn(params...)
 	default:
@@ -811,7 +814,7 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			return
 		}
 		if st.csiIntermediate == '$' && final == '{' {
-			st.listener.EraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
+			st.listener.SelectiveEraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'x' {

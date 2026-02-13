@@ -73,6 +73,7 @@ type mockScreen struct {
 	deleteLines         func(...int)
 	deleteCharacters    func(...int)
 	eraseCharacters     func(...int)
+	selectiveEraseRect  func(int, int, int, int)
 	reportDeviceAttrs   func(int, bool, rune, ...int)
 	cursorToLine        func(...int)
 	reportDeviceStatus  func(int, bool, rune, ...int)
@@ -199,6 +200,18 @@ func (m *mockScreen) SaveCursor() {
 	}
 }
 func (m *mockScreen) RestoreCursor() {
+	if m.restoreCursor != nil {
+		m.restoreCursor()
+	}
+}
+
+func (m *mockScreen) SaveCursorDEC() {
+	if m.saveCursor != nil {
+		m.saveCursor()
+	}
+}
+
+func (m *mockScreen) RestoreCursorDEC() {
 	if m.restoreCursor != nil {
 		m.restoreCursor()
 	}
@@ -386,6 +399,12 @@ func (m *mockScreen) DeleteColumns(count int) {
 func (m *mockScreen) EraseRectangle(top, left, bottom, right int) {
 	if m.eraseRectangle != nil {
 		m.eraseRectangle(top, left, bottom, right)
+	}
+}
+
+func (m *mockScreen) SelectiveEraseRectangle(top, left, bottom, right int) {
+	if m.selectiveEraseRect != nil {
+		m.selectiveEraseRect(top, left, bottom, right)
 	}
 }
 

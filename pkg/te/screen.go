@@ -68,6 +68,13 @@ type Screen struct {
 	charPixelWidth    int
 	charPixelHeight   int
 	windowIconified   bool
+
+	altBuffer     [][]Cell
+	altSavepoints []Savepoint
+	altLineWrapped map[int]bool
+	altWrapNext   bool
+	altActive     bool
+	altSavedCursor *Cursor
 }
 
 func NewScreen(cols, lines int) *Screen {
@@ -86,6 +93,12 @@ func (s *Screen) Reset() {
 	s.markDirtyRange(0, s.Lines-1)
 	s.Buffer = makeBlankCells(s.Lines, s.Columns)
 	s.Margins = nil
+	s.altBuffer = nil
+	s.altSavepoints = nil
+	s.altLineWrapped = nil
+	s.altWrapNext = false
+	s.altActive = false
+	s.altSavedCursor = nil
 	s.Mode = map[int]struct{}{
 		ModeDECAWM:  {},
 		ModeDECTCEM: {},
@@ -222,6 +235,13 @@ func (s *Screen) Resize(lines, columns int) {
 	s.windowPixelHeight = s.Lines * s.charPixelHeight
 	s.screenPixelWidth = s.windowPixelWidth
 	s.screenPixelHeight = s.windowPixelHeight
+
+	if s.altBuffer != nil {
+		s.altBuffer = makeBlankCells(lines, columns)
+		s.altLineWrapped = make(map[int]bool)
+		s.altSavepoints = nil
+		s.altWrapNext = false
+	}
 }
 
 func (s *Screen) Display() []string {
@@ -442,8 +462,21 @@ func (s *Screen) Backspace() {
 }
 
 func (s *Screen) SaveCursor() {
+	s.saveCursorState(true)
+}
+
+func (s *Screen) SaveCursorDEC() {
+	s.saveCursorState(false)
+}
+
+func (s *Screen) saveCursorState(restoreWrap bool) {
 	modeOrigin := s.isModeSet(ModeDECOM)
 	modeWrap := s.isModeSet(ModeDECAWM)
+	wrapNext := s.wrapNext
+	if !restoreWrap {
+		modeWrap = false
+		wrapNext = false
+	}
 	s.Savepoints = append(s.Savepoints, Savepoint{
 		Cursor:   s.Cursor,
 		G0:       s.G0,
@@ -451,15 +484,26 @@ func (s *Screen) SaveCursor() {
 		Charset:  s.Charset,
 		Origin:   modeOrigin,
 		Wrap:     modeWrap,
-		WrapNext: s.wrapNext,
+		WrapNext: wrapNext,
 		SavedCol: s.SavedColumns,
 	})
 }
 
 func (s *Screen) RestoreCursor() {
+	s.restoreCursorState(true)
+}
+
+func (s *Screen) RestoreCursorDEC() {
+	s.restoreCursorState(false)
+}
+
+func (s *Screen) restoreCursorState(restoreWrap bool) {
 	if len(s.Savepoints) == 0 {
 		s.ResetMode([]int{ModeDECOM}, false)
 		s.CursorPosition(0, 0)
+		if !restoreWrap {
+			s.wrapNext = false
+		}
 		return
 	}
 
@@ -473,12 +517,16 @@ func (s *Screen) RestoreCursor() {
 	} else {
 		s.ResetMode([]int{ModeDECOM}, false)
 	}
-	if last.Wrap {
-		s.SetMode([]int{ModeDECAWM}, false)
+	if restoreWrap {
+		if last.Wrap {
+			s.SetMode([]int{ModeDECAWM}, false)
+		} else {
+			s.ResetMode([]int{ModeDECAWM}, false)
+		}
+		s.wrapNext = last.WrapNext
 	} else {
-		s.ResetMode([]int{ModeDECAWM}, false)
+		s.wrapNext = false
 	}
-	s.wrapNext = last.WrapNext
 	s.Cursor = last.Cursor
 	s.ensureHB()
 	s.ensureVB(true)
@@ -1427,11 +1475,109 @@ func (s *Screen) EraseRectangle(top, left, bottom, right int) {
 	s.fillRectangle(top, left, bottom, right, " ")
 }
 
+func (s *Screen) SelectiveEraseRectangle(top, left, bottom, right int) {
+	if top <= 0 {
+		top = 1
+	}
+	if left <= 0 {
+		left = 1
+	}
+	if bottom <= 0 {
+		bottom = s.Lines
+	}
+	if right <= 0 {
+		right = s.Columns
+	}
+	if s.isModeSet(ModeDECOM) && s.Margins != nil {
+		top += s.Margins.Top
+		bottom += s.Margins.Top
+		if s.isModeSet(ModeDECLRMM) {
+			left += s.leftMargin
+			right += s.leftMargin
+		}
+	}
+	if top > bottom || left > right {
+		return
+	}
+	if top < 1 {
+		top = 1
+	}
+	if left < 1 {
+		left = 1
+	}
+	if bottom > s.Lines {
+		bottom = s.Lines
+	}
+	if right > s.Columns {
+		right = s.Columns
+	}
+	for row := top - 1; row <= bottom-1; row++ {
+		for col := left - 1; col <= right-1; col++ {
+			cell := s.Buffer[row][col]
+			if cell.Attr.Protected || cell.Attr.ISOProtected {
+				continue
+			}
+			s.Buffer[row][col] = Cell{Data: " ", Attr: s.defaultAttr()}
+		}
+		s.Dirty[row] = struct{}{}
+	}
+}
+
 func (s *Screen) FillRectangle(ch rune, top, left, bottom, right int) {
 	if ch == 0 {
 		return
 	}
 	s.fillRectangle(top, left, bottom, right, string(ch))
+}
+
+func (s *Screen) enterAltScreen(clear bool, saveCursor bool, moveCursor bool) {
+	if s.altActive {
+		return
+	}
+	if saveCursor {
+		cursor := s.Cursor
+		s.altSavedCursor = &cursor
+	}
+	if s.altBuffer == nil {
+		s.altBuffer = makeBlankCells(s.Lines, s.Columns)
+		s.altLineWrapped = make(map[int]bool)
+	}
+	s.Buffer, s.altBuffer = s.altBuffer, s.Buffer
+	s.Savepoints, s.altSavepoints = s.altSavepoints, s.Savepoints
+	s.lineWrapped, s.altLineWrapped = s.altLineWrapped, s.lineWrapped
+	s.wrapNext, s.altWrapNext = s.altWrapNext, s.wrapNext
+	s.altActive = true
+	if clear {
+		s.Buffer = makeBlankCells(s.Lines, s.Columns)
+		s.lineWrapped = make(map[int]bool)
+		s.wrapNext = false
+	}
+	if moveCursor {
+		s.CursorPosition(0, 0)
+	}
+	s.markDirtyRange(0, s.Lines-1)
+}
+
+func (s *Screen) exitAltScreen(clear bool, restoreCursor bool) {
+	if !s.altActive {
+		return
+	}
+	s.Buffer, s.altBuffer = s.altBuffer, s.Buffer
+	s.Savepoints, s.altSavepoints = s.altSavepoints, s.Savepoints
+	s.lineWrapped, s.altLineWrapped = s.altLineWrapped, s.lineWrapped
+	s.wrapNext, s.altWrapNext = s.altWrapNext, s.wrapNext
+	s.altActive = false
+	if clear {
+		s.altBuffer = makeBlankCells(s.Lines, s.Columns)
+		s.altLineWrapped = make(map[int]bool)
+		s.altWrapNext = false
+		s.altSavepoints = nil
+	}
+	if restoreCursor && s.altSavedCursor != nil {
+		s.Cursor = *s.altSavedCursor
+	}
+	s.altSavedCursor = nil
+	s.markDirtyRange(0, s.Lines-1)
 }
 
 func (s *Screen) fillRectangle(top, left, bottom, right int, data string) {
@@ -2002,7 +2148,11 @@ func (s *Screen) applySetMode(mode int, private bool) {
 	}
 
 	if mode == ModeDECSaveCursor {
-		s.SaveCursor()
+		s.SaveCursorDEC()
+	}
+
+	if mode == ModeAltBuf || mode == ModeAltBufOpt || mode == ModeAltBufCursor {
+		s.enterAltScreen(mode == ModeAltBufCursor, mode == ModeAltBufCursor, mode == ModeAltBufCursor)
 	}
 
 	if mode == ModeDECOM {
@@ -2048,7 +2198,17 @@ func (s *Screen) applyResetMode(mode int, private bool) {
 	}
 
 	if mode == ModeDECSaveCursor {
-		s.RestoreCursor()
+		s.RestoreCursorDEC()
+	}
+
+	if mode == ModeAltBuf {
+		s.exitAltScreen(false, false)
+	}
+	if mode == ModeAltBufOpt {
+		s.exitAltScreen(true, false)
+	}
+	if mode == ModeAltBufCursor {
+		s.exitAltScreen(true, true)
 	}
 
 	if mode == ModeDECOM {
