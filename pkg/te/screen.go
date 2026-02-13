@@ -1118,6 +1118,12 @@ func (s *Screen) AlignmentDisplay() {
 			s.Buffer[row][col] = cell
 		}
 	}
+	s.Margins = nil
+	s.leftMargin = 0
+	s.rightMargin = s.Columns - 1
+	s.lineWrapped = make(map[int]bool)
+	s.wrapNext = false
+	s.CursorPosition(0, 0)
 }
 
 func (s *Screen) SelectGraphicRendition(attrs []int, private bool) {

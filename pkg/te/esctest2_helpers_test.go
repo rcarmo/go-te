@@ -153,6 +153,26 @@ func esctestDECBI(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+"6")
 }
 
+func esctestDECALN(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+"#"+EscDECALN)
+}
+
+func esctestWriteDCS(t *testing.T, stream *Stream, data string) {
+	esctestWrite(t, stream, ControlESC+"P"+data+ControlST)
+}
+
+func esctestWriteAPC(t *testing.T, stream *Stream, data string) {
+	esctestWrite(t, stream, ControlESC+"_"+data+ControlST)
+}
+
+func esctestWritePM(t *testing.T, stream *Stream, data string) {
+	esctestWrite(t, stream, ControlESC+"^"+data+ControlST)
+}
+
+func esctestWriteSOS(t *testing.T, stream *Stream, data string) {
+	esctestWrite(t, stream, ControlESC+"X"+data+ControlST)
+}
+
 func esctestReverseWraparoundMode() int {
 	if esctestXtermReverseWrap >= 383 {
 		return esctestModeReverseWrapExtend
