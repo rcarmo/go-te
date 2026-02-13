@@ -34,6 +34,23 @@ func esctestCUP(t *testing.T, stream *Stream, point esctestPoint) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d%s", ControlCSI, point.Y, point.X, EscCUP))
 }
 
+func esctestCUPParams(t *testing.T, stream *Stream, row, col *int) {
+	if row == nil && col == nil {
+		esctestWrite(t, stream, ControlCSI+EscCUP)
+		return
+	}
+	params := []string{}
+	if row == nil {
+		params = append(params, "")
+	} else {
+		params = append(params, fmt.Sprintf("%d", *row))
+	}
+	if col != nil {
+		params = append(params, fmt.Sprintf("%d", *col))
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, strings.Join(params, ";"), EscCUP))
+}
+
 func esctestDECSET(t *testing.T, stream *Stream, modes ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s?%sh", ControlCSI, esctestJoinParams(modes...)))
 }
@@ -140,6 +157,22 @@ func esctestCUD(t *testing.T, stream *Stream, params ...int) {
 		return
 	}
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUD))
+}
+
+func esctestCUF(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCUF)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUF))
+}
+
+func esctestCUB(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCUB)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUB))
 }
 
 func esctestWrite(t *testing.T, stream *Stream, data string) {
