@@ -690,8 +690,12 @@ func (s *Screen) CursorUp(params ...int) {
 	if count <= 0 {
 		count = 1
 	}
-	top, _ := s.scrollRegion()
-	s.Cursor.Row = maxInt(s.Cursor.Row-count, top)
+	top, bottom := s.scrollRegion()
+	limitTop := 0
+	if s.Cursor.Row >= top && s.Cursor.Row <= bottom {
+		limitTop = top
+	}
+	s.Cursor.Row = maxInt(s.Cursor.Row-count, limitTop)
 }
 
 func (s *Screen) CursorUp1(params ...int) {
@@ -709,8 +713,12 @@ func (s *Screen) CursorDown(params ...int) {
 	if count <= 0 {
 		count = 1
 	}
-	_, bottom := s.scrollRegion()
-	s.Cursor.Row = minInt(s.Cursor.Row+count, bottom)
+	top, bottom := s.scrollRegion()
+	limitBottom := s.Lines - 1
+	if s.Cursor.Row >= top && s.Cursor.Row <= bottom {
+		limitBottom = bottom
+	}
+	s.Cursor.Row = minInt(s.Cursor.Row+count, limitBottom)
 }
 
 func (s *Screen) CursorDown1(params ...int) {

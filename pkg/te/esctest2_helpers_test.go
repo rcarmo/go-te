@@ -126,6 +126,22 @@ func esctestHPR(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscHPR))
 }
 
+func esctestCUU(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCUU)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUU))
+}
+
+func esctestCUD(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCUD)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUD))
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
