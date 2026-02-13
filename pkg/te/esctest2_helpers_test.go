@@ -136,6 +136,22 @@ func esctestECH(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscECH))
 }
 
+func esctestSU(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"S")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sS", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestSD(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"T")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sT", ControlCSI, esctestJoinParams(params...)))
+}
+
 func esctestDCH(t *testing.T, stream *Stream, params ...int) {
 	if len(params) == 0 {
 		esctestWrite(t, stream, ControlCSI+EscDCH)
