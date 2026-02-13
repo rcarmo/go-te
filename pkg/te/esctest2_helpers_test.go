@@ -145,6 +145,14 @@ func esctestSCORC(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlCSI+"u")
 }
 
+func esctestDECFI(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+"9")
+}
+
+func esctestDECBI(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+"6")
+}
+
 func esctestReverseWraparoundMode() int {
 	if esctestXtermReverseWrap >= 383 {
 		return esctestModeReverseWrapExtend
