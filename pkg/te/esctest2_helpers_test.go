@@ -50,6 +50,14 @@ func esctestDECSTBM(t *testing.T, stream *Stream, top, bottom int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d%s", ControlCSI, top, bottom, EscDECSTBM))
 }
 
+func esctestIND(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscIND)
+}
+
+func esctestNEL(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscNEL)
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
