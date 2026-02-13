@@ -1250,6 +1250,12 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, _ ...in
 			if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
 				x -= s.leftMargin
 			}
+			if x < 1 {
+				x = 1
+			}
+			if x > s.Columns {
+				x = s.Columns
+			}
 			s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%d;1R", y, x))
 		}
 		return
@@ -1265,6 +1271,12 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, _ ...in
 		}
 		if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
 			x -= s.leftMargin
+		}
+		if x < 1 {
+			x = 1
+		}
+		if x > s.Columns {
+			x = s.Columns
 		}
 		s.WriteProcessInput(ControlCSI + fmt.Sprintf("%d;%dR", y, x))
 	}

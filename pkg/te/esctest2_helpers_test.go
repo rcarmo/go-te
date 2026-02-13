@@ -3,6 +3,7 @@ package te
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -441,16 +442,24 @@ func esctestJoinParams(params ...int) string {
 }
 
 func esctestGetCursorPosition(screen *Screen) esctestPoint {
-	x := screen.Cursor.Col + 1
-	y := screen.Cursor.Row + 1
-	if x > screen.Columns {
-		x = screen.Columns
+	var response string
+	prev := screen.WriteProcessInput
+	screen.WriteProcessInput = func(data string) { response = data }
+	screen.ReportDeviceStatus(6, false, 0)
+	screen.WriteProcessInput = prev
+	if response == "" {
+		return esctestPoint{X: screen.Cursor.Col + 1, Y: screen.Cursor.Row + 1}
 	}
-	if screen.isModeSet(ModeDECOM) && screen.Margins != nil {
-		y -= screen.Margins.Top
+	response = strings.TrimPrefix(response, ControlCSI)
+	response = strings.TrimSuffix(response, "R")
+	parts := strings.Split(response, ";")
+	if len(parts) < 2 {
+		return esctestPoint{X: screen.Cursor.Col + 1, Y: screen.Cursor.Row + 1}
 	}
-	if screen.isModeSet(ModeDECOM) && screen.isModeSet(ModeDECLRMM) {
-		x -= screen.leftMargin
+	y, errY := strconv.Atoi(parts[0])
+	x, errX := strconv.Atoi(parts[1])
+	if errY != nil || errX != nil {
+		return esctestPoint{X: screen.Cursor.Col + 1, Y: screen.Cursor.Row + 1}
 	}
 	return esctestPoint{X: x, Y: y}
 }
