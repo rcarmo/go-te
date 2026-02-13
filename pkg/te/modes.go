@@ -16,4 +16,6 @@ const (
 	ModeAltBuf            = 47 << 5
 	ModeAltBufOpt         = 1047 << 5
 	ModeAltBufCursor      = 1049 << 5
+	ModeAllow80To132      = 40 << 5
+	ModeMoreFix           = 41 << 5
 )

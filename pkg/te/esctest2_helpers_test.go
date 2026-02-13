@@ -38,6 +38,7 @@ const (
 	esctestModeOptAltBufCursor   = 1049
 	esctestModeSaveRestoreCursor = 1048
 	esctestModeDECRLM            = 34
+	esctestModeMoreFix           = 41
 	esctestXtermReverseWrap      = 383
 
 	esctestTitleSetHex    = 0
@@ -178,6 +179,10 @@ func esctestWriteSOS(t *testing.T, stream *Stream, data string) {
 
 func esctestChangeColor(t *testing.T, stream *Stream, params ...string) {
 	esctestWrite(t, stream, ControlOSC+"4;"+strings.Join(params, ";")+ControlST)
+}
+
+func esctestXtermWinops(t *testing.T, stream *Stream, params ...int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s%st", ControlCSI, esctestJoinParams(params...)))
 }
 
 func esctestResetColor(t *testing.T, stream *Stream, params ...string) {

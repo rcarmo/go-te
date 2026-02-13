@@ -100,8 +100,9 @@ func (s *Screen) Reset() {
 	s.altActive = false
 	s.altSavedCursor = nil
 	s.Mode = map[int]struct{}{
-		ModeDECAWM:  {},
-		ModeDECTCEM: {},
+		ModeDECAWM:        {},
+		ModeDECTCEM:       {},
+		ModeAllow80To132: {},
 	}
 	s.Title = ""
 	s.IconName = ""
@@ -339,7 +340,11 @@ loop:
 					s.Cursor.Col = limit + 1
 					continue
 				}
-				s.Cursor.Col = limit + 1
+				if s.isModeSet(ModeDECLRMM) {
+					s.Cursor.Col = limit
+				} else {
+					s.Cursor.Col = limit + 1
+				}
 			} else {
 				s.Cursor.Col = nextCol
 			}
@@ -439,7 +444,12 @@ func (s *Screen) LineFeed() {
 }
 
 func (s *Screen) Tab() {
-	s.wrapNext = false
+	keepWrap := s.wrapNext && !s.isModeSet(ModeMoreFix)
+	if s.wrapNext && s.isModeSet(ModeMoreFix) {
+		s.wrapNext = false
+		s.LineFeed()
+		s.CarriageReturn()
+	}
 	limit := s.Columns - 1
 	if s.isModeSet(ModeDECLRMM) {
 		limit = s.rightMargin
@@ -455,6 +465,9 @@ func (s *Screen) Tab() {
 		column = limit
 	}
 	s.Cursor.Col = column
+	if !keepWrap {
+		s.wrapNext = false
+	}
 }
 
 func (s *Screen) Backspace() {
@@ -1384,7 +1397,7 @@ func (s *Screen) SoftReset() {
 	s.Margins = nil
 	s.leftMargin = 0
 	s.rightMargin = s.Columns - 1
-	s.Mode = map[int]struct{}{ModeDECAWM: {}, ModeDECTCEM: {}}
+	s.Mode = map[int]struct{}{ModeDECAWM: {}, ModeDECTCEM: {}, ModeAllow80To132: {}}
 	s.Cursor.Attr = s.defaultAttr()
 	s.G0 = charsetLat1
 	s.G1 = charsetVT100
@@ -2191,6 +2204,9 @@ func (s *Screen) applySetMode(mode int, private bool) {
 	s.Mode[mode] = struct{}{}
 
 	if mode == ModeDECCOLM {
+		if !s.isModeSet(ModeAllow80To132) {
+			return
+		}
 		saved := s.Columns
 		s.SavedColumns = &saved
 		s.Resize(s.Lines, 132)
@@ -2241,6 +2257,9 @@ func (s *Screen) applyResetMode(mode int, private bool) {
 
 	if mode == ModeDECCOLM {
 		if s.Columns == 132 && s.SavedColumns != nil {
+			if !s.isModeSet(ModeAllow80To132) {
+				return
+			}
 			s.Resize(s.Lines, *s.SavedColumns)
 			s.SavedColumns = nil
 		}
