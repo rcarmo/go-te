@@ -23,6 +23,8 @@ type EventHandler interface {
 	Index()
 	ReverseIndex()
 	SetTabStop()
+	StartProtectedArea()
+	EndProtectedArea()
 	ClearTabStop(how ...int)
 	SaveCursor()
 	RestoreCursor()
@@ -299,6 +301,10 @@ func (st *Stream) handleGround(ch rune) error {
 		st.listener.CarriageReturn()
 	case '\x88':
 		st.listener.SetTabStop()
+	case '\x96':
+		st.listener.StartProtectedArea()
+	case '\x97':
+		st.listener.EndProtectedArea()
 	case '\x8d':
 		st.listener.ReverseIndex()
 	case '\x90':
@@ -371,6 +377,10 @@ func (st *Stream) handleEscape(ch rune) error {
 		st.listener.ReverseIndex()
 	case 'H':
 		st.listener.SetTabStop()
+	case 'V':
+		st.listener.StartProtectedArea()
+	case 'W':
+		st.listener.EndProtectedArea()
 	case '7':
 		st.listener.SaveCursor()
 	case '8':
@@ -872,7 +882,7 @@ func (st *Stream) isPlainText(ch rune) bool {
 		return false
 	}
 	switch ch {
-	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f', '\x84', '\x85', '\x88', '\x8d', '\x90', '\x98', '\x9a', '\x9e', '\x9f':
+	case '\x07', '\x08', '\t', '\n', '\x0b', '\x0c', '\r', '\x0e', '\x0f', '\x84', '\x85', '\x88', '\x8d', '\x90', '\x96', '\x97', '\x98', '\x9a', '\x9e', '\x9f':
 		return false
 	}
 	return true

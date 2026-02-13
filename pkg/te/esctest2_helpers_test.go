@@ -112,6 +112,30 @@ func esctestRI(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscRI)
 }
 
+func esctestED(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscED)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscED))
+}
+
+func esctestEL(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscEL)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscEL))
+}
+
+func esctestECH(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscECH)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscECH))
+}
+
 func esctestHTS(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscHTS)
 }
@@ -257,6 +281,10 @@ func esctestAssertEQ(t *testing.T, got, want interface{}) {
 }
 
 func esctestEmpty() string {
+	return " "
+}
+
+func esctestBlank() string {
 	return " "
 }
 
