@@ -25,9 +25,12 @@ type esctestRect struct {
 }
 
 const (
-	esctestModeDECOM   = 6
-	esctestModeDECAWM  = 7
-	esctestModeDECLRMM = 69
+	esctestModeDECOM            = 6
+	esctestModeDECAWM           = 7
+	esctestModeDECLRMM          = 69
+	esctestModeReverseWrapInline = 45
+	esctestModeReverseWrapExtend = 1045
+	esctestXtermReverseWrap      = 383
 )
 
 func esctestCUP(t *testing.T, stream *Stream, point esctestPoint) {
@@ -110,6 +113,13 @@ func esctestNEL(t *testing.T, stream *Stream) {
 
 func esctestRI(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscRI)
+}
+
+func esctestReverseWraparoundMode() int {
+	if esctestXtermReverseWrap >= 383 {
+		return esctestModeReverseWrapExtend
+	}
+	return esctestModeReverseWrapInline
 }
 
 func esctestED(t *testing.T, stream *Stream, params ...int) {
