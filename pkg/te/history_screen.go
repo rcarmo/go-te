@@ -164,6 +164,12 @@ func (h *HistoryScreen) EndProtectedArea() {
 	h.afterEvent("end_protected_area")
 }
 
+func (h *HistoryScreen) SetCharacterProtection(mode int) {
+	h.beforeEvent("set_character_protection")
+	h.Screen.SetCharacterProtection(mode)
+	h.afterEvent("set_character_protection")
+}
+
 func (h *HistoryScreen) ClearTabStop(how ...int) {
 	h.beforeEvent("clear_tab_stop")
 	h.Screen.ClearTabStop(how...)

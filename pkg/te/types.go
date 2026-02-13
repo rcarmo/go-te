@@ -26,6 +26,7 @@ type Attr struct {
 	Blink         bool
 	Conceal       bool
 	Protected     bool
+	ISOProtected  bool
 }
 
 type Cell struct {

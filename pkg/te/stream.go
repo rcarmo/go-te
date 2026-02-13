@@ -25,6 +25,7 @@ type EventHandler interface {
 	SetTabStop()
 	StartProtectedArea()
 	EndProtectedArea()
+	SetCharacterProtection(mode int)
 	ClearTabStop(how ...int)
 	SaveCursor()
 	RestoreCursor()
@@ -665,6 +666,9 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		if len(params) > 1 {
 			rest = params[1:]
 		}
+		if how == 3 && !st.private {
+			return
+		}
 		st.listener.EraseInDisplay(how, st.private, rest...)
 	case 'K':
 		how := defaultParam(params, 0, 0)
@@ -768,6 +772,10 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			level := defaultParam(params, 0, 0)
 			seven := defaultParam(params, 1, 0)
 			st.listener.SetConformance(level, seven)
+			return
+		}
+		if st.csiIntermediate == '"' && final == 'q' {
+			st.listener.SetCharacterProtection(defaultParam(params, 0, 0))
 			return
 		}
 		if final == 't' {

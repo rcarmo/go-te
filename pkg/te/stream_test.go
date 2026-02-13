@@ -47,6 +47,7 @@ type mockScreen struct {
 	setTabStop          func()
 	startProtectedArea  func()
 	endProtectedArea    func()
+	setCharacterProtection func(int)
 	clearTabStop        func(...int)
 	saveCursor          func()
 	restoreCursor       func()
@@ -180,6 +181,11 @@ func (m *mockScreen) StartProtectedArea() {
 func (m *mockScreen) EndProtectedArea() {
 	if m.endProtectedArea != nil {
 		m.endProtectedArea()
+	}
+}
+func (m *mockScreen) SetCharacterProtection(mode int) {
+	if m.setCharacterProtection != nil {
+		m.setCharacterProtection(mode)
 	}
 }
 func (m *mockScreen) ClearTabStop(how ...int) {

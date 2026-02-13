@@ -55,6 +55,9 @@ func (d *DebugScreen) StartProtectedArea() {
 func (d *DebugScreen) EndProtectedArea() {
 	d.record("end_protected_area", nil, map[string]interface{}{})
 }
+func (d *DebugScreen) SetCharacterProtection(mode int) {
+	d.record("set_character_protection", []interface{}{mode}, map[string]interface{}{})
+}
 func (d *DebugScreen) ClearTabStop(how ...int) {
 	d.record("clear_tab_stop", intsToInterfaces(how), map[string]interface{}{})
 }

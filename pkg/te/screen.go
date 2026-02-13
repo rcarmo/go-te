@@ -607,7 +607,7 @@ func (s *Screen) EraseCharacters(params ...int) {
 	line := s.Buffer[s.Cursor.Row]
 	end := minInt(s.Cursor.Col+count-1, right)
 	for col := s.Cursor.Col; col <= end; col++ {
-		if line[col].Attr.Protected {
+		if line[col].Attr.ISOProtected {
 			continue
 		}
 		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
@@ -632,7 +632,7 @@ func (s *Screen) EraseInLine(how int, private bool, _ ...int) {
 		end = right + 1
 	}
 	for col := start; col < end; col++ {
-		if line[col].Attr.Protected {
+		if line[col].Attr.ISOProtected {
 			continue
 		}
 		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
@@ -640,6 +640,9 @@ func (s *Screen) EraseInLine(how int, private bool, _ ...int) {
 }
 
 func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
+	if how == 3 {
+		how = 2
+	}
 	var start, end int
 	switch how {
 	case 0:
@@ -648,7 +651,7 @@ func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
 	case 1:
 		start = 0
 		end = s.Cursor.Row
-	case 2, 3:
+	case 2:
 		start = 0
 		end = s.Lines
 	}
@@ -658,14 +661,14 @@ func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
 	for row := start; row < end; row++ {
 		line := s.Buffer[row]
 		for col := 0; col < s.Columns; col++ {
-			if line[col].Attr.Protected {
+			if line[col].Attr.ISOProtected {
 				continue
 			}
 			line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
 		}
 		s.Dirty[row] = struct{}{}
 	}
-	if how == 2 || how == 3 {
+	if how == 2 {
 		s.markDirtyRange(0, s.Lines-1)
 	}
 }
@@ -675,10 +678,18 @@ func (s *Screen) SetTabStop() {
 }
 
 func (s *Screen) StartProtectedArea() {
-	s.Cursor.Attr.Protected = true
+	s.Cursor.Attr.ISOProtected = true
 }
 
 func (s *Screen) EndProtectedArea() {
+	s.Cursor.Attr.ISOProtected = false
+}
+
+func (s *Screen) SetCharacterProtection(mode int) {
+	if mode == 1 {
+		s.Cursor.Attr.Protected = true
+		return
+	}
 	s.Cursor.Attr.Protected = false
 }
 
