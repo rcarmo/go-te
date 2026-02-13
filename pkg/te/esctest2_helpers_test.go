@@ -175,6 +175,22 @@ func esctestCUB(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCUB))
 }
 
+func esctestCNL(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCNL)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCNL))
+}
+
+func esctestCPL(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCPL)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCPL))
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
