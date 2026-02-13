@@ -102,6 +102,30 @@ func esctestVPA(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscVPA))
 }
 
+func esctestVPR(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscVPR)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscVPR))
+}
+
+func esctestHPA(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscHPA)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscHPA))
+}
+
+func esctestHPR(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscHPR)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscHPR))
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
