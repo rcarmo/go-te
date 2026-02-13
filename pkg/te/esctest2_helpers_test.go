@@ -46,8 +46,16 @@ func esctestDECSLRM(t *testing.T, stream *Stream, left, right int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d%s", ControlCSI, left, right, "s"))
 }
 
-func esctestDECSTBM(t *testing.T, stream *Stream, top, bottom int) {
-	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d%s", ControlCSI, top, bottom, EscDECSTBM))
+func esctestDECSTBM(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscDECSTBM)
+		return
+	}
+	if len(params) == 1 {
+		esctestWrite(t, stream, fmt.Sprintf("%s%d%s", ControlCSI, params[0], EscDECSTBM))
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d%s", ControlCSI, params[0], params[1], EscDECSTBM))
 }
 
 func esctestIND(t *testing.T, stream *Stream) {
@@ -78,6 +86,22 @@ func esctestCBT(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%sZ", ControlCSI, esctestJoinParams(params...)))
 }
 
+func esctestCHA(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscCHA)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscCHA))
+}
+
+func esctestVPA(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscVPA)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscVPA))
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
@@ -93,7 +117,15 @@ func esctestJoinParams(params ...int) string {
 }
 
 func esctestGetCursorPosition(screen *Screen) esctestPoint {
-	return esctestPoint{X: screen.Cursor.Col + 1, Y: screen.Cursor.Row + 1}
+	x := screen.Cursor.Col + 1
+	y := screen.Cursor.Row + 1
+	if screen.isModeSet(ModeDECOM) && screen.Margins != nil {
+		y -= screen.Margins.Top
+	}
+	if screen.isModeSet(ModeDECOM) && screen.isModeSet(ModeDECLRMM) {
+		x -= screen.leftMargin
+	}
+	return esctestPoint{X: x, Y: y}
 }
 
 func esctestGetScreenSize(screen *Screen) esctestSize {
