@@ -108,6 +108,10 @@ func esctestNEL(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscNEL)
 }
 
+func esctestRI(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscRI)
+}
+
 func esctestHTS(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscHTS)
 }
