@@ -176,6 +176,71 @@ func esctestWriteSOS(t *testing.T, stream *Stream, data string) {
 	esctestWrite(t, stream, ControlESC+"X"+data+ControlST)
 }
 
+func esctestChangeColor(t *testing.T, stream *Stream, params ...string) {
+	esctestWrite(t, stream, ControlOSC+"4;"+strings.Join(params, ";")+ControlST)
+}
+
+func esctestResetColor(t *testing.T, stream *Stream, params ...string) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlOSC+"104"+ControlST)
+		return
+	}
+	esctestWrite(t, stream, ControlOSC+"104;"+strings.Join(params, ";")+ControlST)
+}
+
+func esctestXtermSave(t *testing.T, stream *Stream, params ...int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s?%ss", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestXtermRestore(t *testing.T, stream *Stream, params ...int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s?%sr", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestCaptureResponse(screen *Screen, fn func()) string {
+	var response string
+	prev := screen.WriteProcessInput
+	screen.WriteProcessInput = func(data string) { response = data }
+	fn()
+	screen.WriteProcessInput = prev
+	return response
+}
+
+func esctestParseCSI(t *testing.T, response string, prefix rune) []int {
+	if !strings.HasPrefix(response, ControlCSI) {
+		t.Fatalf("expected CSI response, got %q", response)
+	}
+	payload := strings.TrimPrefix(response, ControlCSI)
+	if prefix != 0 {
+		if len(payload) == 0 || rune(payload[0]) != prefix {
+			t.Fatalf("expected CSI prefix %q, got %q", string(prefix), response)
+		}
+		payload = payload[1:]
+	}
+	payload = strings.TrimSuffix(payload, "c")
+	if payload == "" {
+		return nil
+	}
+	parts := strings.Split(payload, ";")
+	params := make([]int, 0, len(parts))
+	for _, part := range parts {
+		value, err := strconv.Atoi(part)
+		if err != nil {
+			t.Fatalf("invalid CSI param %q", part)
+		}
+		params = append(params, value)
+	}
+	return params
+}
+
+func esctestReadOSC(t *testing.T, response string, prefix string) string {
+	if !strings.HasPrefix(response, ControlOSC+prefix) {
+		t.Fatalf("expected OSC %s response, got %q", prefix, response)
+	}
+	payload := strings.TrimPrefix(response, ControlOSC+prefix)
+	payload = strings.TrimSuffix(payload, ControlST)
+	return payload
+}
+
 func esctestReverseWraparoundMode() int {
 	if esctestXtermReverseWrap >= 383 {
 		return esctestModeReverseWrapExtend

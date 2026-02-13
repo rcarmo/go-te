@@ -125,7 +125,7 @@ func (s *Screen) Reset() {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
-	s.conformanceLevel = 4
+	s.conformanceLevel = 1
 	s.titleStack = nil
 	s.iconStack = nil
 	if s.charPixelWidth == 0 {
@@ -222,7 +222,7 @@ func (s *Screen) Resize(lines, columns int) {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
-	s.conformanceLevel = 4
+	s.conformanceLevel = 1
 	s.titleStack = nil
 	s.iconStack = nil
 	if s.charPixelWidth == 0 {
@@ -1227,15 +1227,48 @@ func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune, _ .
 		return
 	}
 	if prefix == '>' {
-		s.WriteProcessInput(ControlCSI + ">0;0;0c")
+		p0 := 0
+		switch s.conformanceLevel {
+		case 5:
+			p0 = 64
+		case 4:
+			p0 = 41
+		case 3:
+			p0 = 24
+		case 2:
+			p0 = 1
+		default:
+			p0 = 0
+		}
+		p1 := 400
+		p2 := 0
+		s.WriteProcessInput(ControlCSI + fmt.Sprintf(">%d;%d;%dc", p0, p1, p2))
 		return
 	}
-	if !private {
-		s.WriteProcessInput(ControlCSI + "?6c")
-		return
+	params := []int{}
+	switch s.conformanceLevel {
+	case 5:
+		params = []int{65, 1, 2, 6, 9, 15, 16, 17, 18, 21, 22, 28, 29}
+	case 4:
+		params = []int{64, 1, 2, 6, 9, 15, 16, 17, 18, 21, 22, 28, 29}
+	case 3:
+		params = []int{63, 1, 2, 6, 9, 15, 22, 29}
+	case 2:
+		params = []int{62, 1, 2, 6, 9, 15, 22, 29}
+	case 1:
+		params = []int{6}
+	default:
+		params = []int{6}
 	}
-	if prefix == '?' {
-		s.WriteProcessInput(ControlCSI + "?6c")
+	var b strings.Builder
+	for i, param := range params {
+		if i > 0 {
+			b.WriteString(";")
+		}
+		b.WriteString(fmt.Sprintf("%d", param))
+	}
+	if !private || prefix == '?' {
+		s.WriteProcessInput(ControlCSI + "?" + b.String() + "c")
 	}
 }
 
@@ -1364,7 +1397,7 @@ func (s *Screen) SoftReset() {
 	s.specialColors = make(map[int]string)
 	s.titleHexInput = false
 	s.titleHexOutput = false
-	s.conformanceLevel = 4
+	s.conformanceLevel = 1
 	s.titleStack = nil
 	s.iconStack = nil
 }
