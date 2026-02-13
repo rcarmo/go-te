@@ -25,12 +25,19 @@ type esctestRect struct {
 }
 
 const (
-	esctestModeDECOM            = 6
-	esctestModeDECAWM           = 7
-	esctestModeDECLRMM          = 69
+	esctestModeDECOM             = 6
+	esctestModeDECAWM            = 7
+	esctestModeDECLRMM           = 69
 	esctestModeReverseWrapInline = 45
 	esctestModeReverseWrapExtend = 1045
+	esctestModeAllow80To132      = 40
+	esctestModeAltBuf            = 47
 	esctestXtermReverseWrap      = 383
+
+	esctestTitleSetHex   = 0
+	esctestTitleQueryHex = 1
+	esctestTitleSetUTF8  = 2
+	esctestTitleQueryUTF8 = 3
 )
 
 func esctestCUP(t *testing.T, stream *Stream, point esctestPoint) {
@@ -115,6 +122,10 @@ func esctestRI(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscRI)
 }
 
+func esctestRIS(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscRIS)
+}
+
 func esctestReverseWraparoundMode() int {
 	if esctestXtermReverseWrap >= 383 {
 		return esctestModeReverseWrapExtend
@@ -144,6 +155,38 @@ func esctestECH(t *testing.T, stream *Stream, params ...int) {
 		return
 	}
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscECH))
+}
+
+func esctestREP(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"b")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sb", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestRMTitle(t *testing.T, stream *Stream, params ...int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s>%sT", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestSMTitle(t *testing.T, stream *Stream, params ...int) {
+	esctestWrite(t, stream, fmt.Sprintf("%s>%st", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestChangeWindowTitle(t *testing.T, stream *Stream, title string) {
+	esctestWrite(t, stream, fmt.Sprintf("%s2;%s%s", ControlOSC, title, ControlST))
+}
+
+func esctestChangeIconTitle(t *testing.T, stream *Stream, title string) {
+	esctestWrite(t, stream, fmt.Sprintf("%s1;%s%s", ControlOSC, title, ControlST))
+}
+
+func esctestGetWindowTitle(screen *Screen) string {
+	return screen.Title
+}
+
+func esctestGetIconTitle(screen *Screen) string {
+	return screen.IconName
 }
 
 func esctestSU(t *testing.T, stream *Stream, params ...int) {
