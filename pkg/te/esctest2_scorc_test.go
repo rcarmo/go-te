@@ -55,6 +55,7 @@ func TestEsctestScorcTestSaveRestoreCursorResetsOriginMode(t *testing.T) {
 	esctestAssertScreenCharsInRectEqual(t, screen, esctestRect{Left: 1, Top: 1, Right: 1, Bottom: 1}, []string{"X"})
 }
 
+// From esctest2/esctest/tests/scorc.py::test_SaveRestoreCursor_WorksInLRM
 // From esctest2/esctest/tests/save_restore_cursor.py::test_SaveRestoreCursor_WorksInLRM
 func TestEsctestScorcTestSaveRestoreCursorWorksInLRM(t *testing.T) {
 	screen := NewScreen(80, 24)

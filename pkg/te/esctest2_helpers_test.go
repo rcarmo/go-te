@@ -29,6 +29,7 @@ const (
 	esctestModeDECOM             = 6
 	esctestModeDECAWM            = 7
 	esctestModeIRM               = 4
+	esctestModeLNM               = 20
 	esctestModeDECLRMM           = 69
 	esctestModeReverseWrapInline = 45
 	esctestModeReverseWrapExtend = 1045
@@ -39,6 +40,23 @@ const (
 	esctestModeSaveRestoreCursor = 1048
 	esctestModeDECRLM            = 34
 	esctestModeMoreFix           = 41
+	esctestModeDECCKM            = 1
+	esctestModeDECSCLM           = 4
+	esctestModeDECARM            = 8
+	esctestModeDECPFF            = 18
+	esctestModeDECPEX            = 19
+	esctestModeDECNRCM           = 42
+	esctestModeDECNKM            = 66
+	esctestModeDECBKM            = 67
+	esctestModeDECKBUM           = 68
+	esctestModeDECNCSM           = 95
+	esctestModeDECOSCNM          = 106
+	esctestModeDECHCCM           = 60
+	esctestModeDECAAM            = 100
+	esctestModeDECCANSM          = 101
+	esctestModeDECNULM           = 102
+	esctestModeDECHDPXM          = 103
+	esctestModeDECESKM           = 104
 	esctestXtermReverseWrap      = 383
 
 	esctestTitleSetHex    = 0
@@ -185,6 +203,52 @@ func esctestXtermWinops(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%st", ControlCSI, esctestJoinParams(params...)))
 }
 
+func esctestGetIndexedColors() int {
+	return 16
+}
+
+func esctestChangeDynamicColor(t *testing.T, stream *Stream, params ...string) {
+	esctestWrite(t, stream, ControlOSC+strings.Join(params, ";")+ControlST)
+}
+
+func esctestChangeSpecialColor(t *testing.T, stream *Stream, params ...string) {
+	if len(params) > 0 {
+		if index, err := strconv.Atoi(params[0]); err == nil && index >= 10 {
+			esctestWrite(t, stream, ControlOSC+strings.Join(params, ";")+ControlST)
+			return
+		}
+	}
+	offset := esctestGetIndexedColors()
+	parts := make([]string, len(params))
+	copy(parts, params)
+	for i := 0; i < len(parts); i += 2 {
+		index, err := strconv.Atoi(parts[i])
+		if err != nil {
+			continue
+		}
+		parts[i] = fmt.Sprintf("%d", index+offset)
+	}
+	esctestWrite(t, stream, ControlOSC+"4;"+strings.Join(parts, ";")+ControlST)
+}
+
+func esctestChangeSpecialColor2(t *testing.T, stream *Stream, params ...string) {
+	if len(params) > 0 {
+		if index, err := strconv.Atoi(params[0]); err == nil && index >= 10 {
+			esctestWrite(t, stream, ControlOSC+strings.Join(params, ";")+ControlST)
+			return
+		}
+	}
+	esctestWrite(t, stream, ControlOSC+"5;"+strings.Join(params, ";")+ControlST)
+}
+
+func esctestResetSpecialColor(t *testing.T, stream *Stream, params ...string) {
+	esctestWrite(t, stream, ControlOSC+"105;"+strings.Join(params, ";")+ControlST)
+}
+
+func esctestResetDynamicColor(t *testing.T, stream *Stream, code string) {
+	esctestWrite(t, stream, ControlOSC+code+ControlST)
+}
+
 func esctestResetColor(t *testing.T, stream *Stream, params ...string) {
 	if len(params) == 0 {
 		esctestWrite(t, stream, ControlOSC+"104"+ControlST)
@@ -211,30 +275,7 @@ func esctestCaptureResponse(screen *Screen, fn func()) string {
 }
 
 func esctestParseCSI(t *testing.T, response string, prefix rune) []int {
-	if !strings.HasPrefix(response, ControlCSI) {
-		t.Fatalf("expected CSI response, got %q", response)
-	}
-	payload := strings.TrimPrefix(response, ControlCSI)
-	if prefix != 0 {
-		if len(payload) == 0 || rune(payload[0]) != prefix {
-			t.Fatalf("expected CSI prefix %q, got %q", string(prefix), response)
-		}
-		payload = payload[1:]
-	}
-	payload = strings.TrimSuffix(payload, "c")
-	if payload == "" {
-		return nil
-	}
-	parts := strings.Split(payload, ";")
-	params := make([]int, 0, len(parts))
-	for _, part := range parts {
-		value, err := strconv.Atoi(part)
-		if err != nil {
-			t.Fatalf("invalid CSI param %q", part)
-		}
-		params = append(params, value)
-	}
-	return params
+	return esctestReadCSI(t, response, 'c', prefix)
 }
 
 func esctestReadOSC(t *testing.T, response string, prefix string) string {
@@ -309,8 +350,143 @@ func esctestRM(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%sl", ControlCSI, esctestJoinParams(params...)))
 }
 
+func esctestSGR(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscSGR)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscSGR))
+}
+
+func esctestReadCSI(t *testing.T, response string, expectedFinal rune, expectedPrefix rune) []int {
+	if !strings.HasPrefix(response, ControlCSI) {
+		t.Fatalf("expected CSI response, got %q", response)
+	}
+	payload := strings.TrimPrefix(response, ControlCSI)
+	if expectedPrefix != 0 {
+		if len(payload) == 0 || rune(payload[0]) != expectedPrefix {
+			t.Fatalf("expected CSI prefix %q, got %q", string(expectedPrefix), response)
+		}
+		payload = payload[1:]
+	}
+	if !strings.HasSuffix(payload, string(expectedFinal)) {
+		t.Fatalf("expected CSI final %q, got %q", string(expectedFinal), response)
+	}
+	payload = strings.TrimSuffix(payload, string(expectedFinal))
+	if payload == "" {
+		return nil
+	}
+	parts := strings.Split(payload, ";")
+	params := make([]int, 0, len(parts))
+	for _, part := range parts {
+		value, err := strconv.Atoi(part)
+		if err != nil {
+			t.Fatalf("invalid CSI param %q", part)
+		}
+		params = append(params, value)
+	}
+	return params
+}
+
+func esctestDECIC(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"'}")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s'}", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECDC(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"'~")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s'~", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECCRA(t *testing.T, stream *Stream, srcTop, srcLeft, srcBottom, srcRight, srcPage, dstTop, dstLeft, dstPage *int) {
+	params := esctestJoinOptionalParams(srcTop, srcLeft, srcBottom, srcRight, srcPage, dstTop, dstLeft, dstPage)
+	esctestWrite(t, stream, ControlCSI+params+"$v")
+}
+
 func esctestDECSTR(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlCSI+"!p")
+}
+
+func esctestDECRQM(t *testing.T, stream *Stream, mode int, dec bool) {
+	prefix := ""
+	if dec {
+		prefix = "?"
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%d$p", ControlCSI, prefix, mode))
+}
+
+func esctestDECRQSS(t *testing.T, stream *Stream, query string) {
+	esctestWriteDCS(t, stream, "$q"+query)
+}
+
+func esctestDECELF(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"+q")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s+q", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECLFKC(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"*}")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s*}", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSACE(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"*x")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s*x", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSCL(t *testing.T, stream *Stream, level int, sevenBit *int) {
+	if sevenBit == nil {
+		esctestWrite(t, stream, fmt.Sprintf("%s%d\"p", ControlCSI, level))
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%d;%d\"p", ControlCSI, level, *sevenBit))
+}
+
+func esctestDECSMKR(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"+r")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s+r", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSNLS(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"*|")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s*|", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSSDT(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"$~")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s$~", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSCUSR(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+" q")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s q", ControlCSI, esctestJoinParams(params...)))
 }
 
 func esctestDECSASD(t *testing.T, stream *Stream, params ...int) {
@@ -335,6 +511,40 @@ func esctestDECSED(t *testing.T, stream *Stream, params ...int) {
 		return
 	}
 	esctestWrite(t, stream, fmt.Sprintf("%s?%sJ", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSEL(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"?K")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s?%sK", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECERA(t *testing.T, stream *Stream, top, left, bottom, right *int) {
+	params := esctestJoinOptionalParams(top, left, bottom, right)
+	esctestWrite(t, stream, fmt.Sprintf("%s%s$z", ControlCSI, params))
+}
+
+func esctestDECFRA(t *testing.T, stream *Stream, ch int, top, left, bottom, right *int) {
+	params := []string{fmt.Sprintf("%d", ch)}
+	optional := []*int{top, left, bottom, right}
+	for _, value := range optional {
+		if value == nil {
+			params = append(params, "")
+			continue
+		}
+		params = append(params, fmt.Sprintf("%d", *value))
+	}
+	for len(params) > 0 && params[len(params)-1] == "" {
+		params = params[:len(params)-1]
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s$x", ControlCSI, strings.Join(params, ";")))
+}
+
+func esctestDECSERAParams(t *testing.T, stream *Stream, top, left, bottom, right *int) {
+	params := esctestJoinOptionalParams(top, left, bottom, right)
+	esctestWrite(t, stream, fmt.Sprintf("%s%s${", ControlCSI, params))
 }
 
 func esctestDECSERA(t *testing.T, stream *Stream, top, left, bottom, right int) {
@@ -511,6 +721,25 @@ func esctestJoinParams(params ...int) string {
 	return strings.Join(parts, ";")
 }
 
+func esctestJoinOptionalParams(values ...*int) string {
+	parts := make([]string, len(values))
+	for i, value := range values {
+		if value == nil {
+			parts[i] = ""
+			continue
+		}
+		parts[i] = fmt.Sprintf("%d", *value)
+	}
+	for len(parts) > 0 && parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+	return strings.Join(parts, ";")
+}
+
+func esctestIntPtr(value int) *int {
+	return &value
+}
+
 func esctestGetCursorPosition(screen *Screen) esctestPoint {
 	var response string
 	prev := screen.WriteProcessInput
@@ -544,6 +773,30 @@ func esctestAssertEQ(t *testing.T, got, want interface{}) {
 	}
 }
 
+func esctestAtoi(value string) int {
+	out := 0
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return out
+		}
+		out = out*10 + int(r-'0')
+	}
+	return out
+}
+
+func esctestItoa(value int) string {
+	if value == 0 {
+		return "0"
+	}
+	buf := make([]byte, 0, 6)
+	for value > 0 {
+		d := value % 10
+		buf = append([]byte{byte('0' + d)}, buf...)
+		value /= 10
+	}
+	return string(buf)
+}
+
 func esctestEmpty() string {
 	return " "
 }
@@ -573,5 +826,38 @@ func esctestAssertScreenCharsInRectEqual(t *testing.T, screen *Screen, rect esct
 		if got != want {
 			t.Fatalf("row %d: expected %q, got %q", row, want, got)
 		}
+	}
+}
+
+func esctestAssertCharHasSGR(t *testing.T, screen *Screen, point esctestPoint, missing, present []int) {
+	cell := screen.Buffer[point.Y-1][point.X-1]
+	for _, attr := range missing {
+		if esctestCharHasSGR(cell, attr) {
+			t.Fatalf("expected attr %d to be unset", attr)
+		}
+	}
+	for _, attr := range present {
+		if !esctestCharHasSGR(cell, attr) {
+			t.Fatalf("expected attr %d to be set", attr)
+		}
+	}
+}
+
+func esctestCharHasSGR(cell Cell, attr int) bool {
+	switch attr {
+	case 1:
+		return cell.Attr.Bold
+	case 22:
+		return !cell.Attr.Bold
+	case 30:
+		return cell.Attr.Fg.Mode == ColorANSI16 && cell.Attr.Fg.Index == 0
+	case 39:
+		return cell.Attr.Fg.Mode == ColorDefault
+	case 40:
+		return cell.Attr.Bg.Mode == ColorANSI16 && cell.Attr.Bg.Index == 0
+	case 49:
+		return cell.Attr.Bg.Mode == ColorDefault
+	default:
+		return false
 	}
 }

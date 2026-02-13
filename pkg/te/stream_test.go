@@ -99,6 +99,7 @@ type mockScreen struct {
 	setSpecialColor     func(int, string)
 	querySpecialColor   func(int)
 	resetSpecialColor   func(int, bool)
+	resetDynamicColor   func(int, bool)
 	setTitleMode        func([]int, bool)
 	setConformance      func(int, int)
 	windowOp            func([]int)
@@ -477,6 +478,12 @@ func (m *mockScreen) QuerySpecialColor(index int) {
 func (m *mockScreen) ResetSpecialColor(index int, all bool) {
 	if m.resetSpecialColor != nil {
 		m.resetSpecialColor(index, all)
+	}
+}
+
+func (m *mockScreen) ResetDynamicColor(index int, all bool) {
+	if m.resetDynamicColor != nil {
+		m.resetDynamicColor(index, all)
 	}
 }
 

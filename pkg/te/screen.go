@@ -68,12 +68,13 @@ type Screen struct {
 	charPixelWidth    int
 	charPixelHeight   int
 	windowIconified   bool
+	indexedColors     int
 
-	altBuffer     [][]Cell
-	altSavepoints []Savepoint
+	altBuffer      [][]Cell
+	altSavepoints  []Savepoint
 	altLineWrapped map[int]bool
-	altWrapNext   bool
-	altActive     bool
+	altWrapNext    bool
+	altActive      bool
 	altSavedCursor *Cursor
 }
 
@@ -100,8 +101,8 @@ func (s *Screen) Reset() {
 	s.altActive = false
 	s.altSavedCursor = nil
 	s.Mode = map[int]struct{}{
-		ModeDECAWM:        {},
-		ModeDECTCEM:       {},
+		ModeDECAWM:       {},
+		ModeDECTCEM:      {},
 		ModeAllow80To132: {},
 	}
 	s.Title = ""
@@ -142,6 +143,9 @@ func (s *Screen) Reset() {
 	s.windowPosX = 0
 	s.windowPosY = 0
 	s.windowIconified = false
+	if s.indexedColors == 0 {
+		s.indexedColors = 16
+	}
 	if s.WriteProcessInput == nil {
 		s.WriteProcessInput = func(string) {}
 	}
@@ -213,6 +217,20 @@ func (s *Screen) Resize(lines, columns int) {
 	s.Columns = columns
 	s.SetMargins(0, 0)
 	s.leftMargin = 0
+	if s.charPixelWidth == 0 {
+		s.charPixelWidth = 8
+	}
+	if s.charPixelHeight == 0 {
+		s.charPixelHeight = 16
+	}
+	s.windowPixelWidth = s.Columns * s.charPixelWidth
+	s.windowPixelHeight = s.Lines * s.charPixelHeight
+	if s.screenPixelWidth == 0 {
+		s.screenPixelWidth = s.windowPixelWidth
+	}
+	if s.screenPixelHeight == 0 {
+		s.screenPixelHeight = s.windowPixelHeight
+	}
 	s.rightMargin = s.Columns - 1
 	s.lineWrapped = make(map[int]bool)
 	s.wrapNext = false
@@ -1285,9 +1303,10 @@ func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune, _ .
 	}
 }
 
-func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, _ ...int) {
+func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ...int) {
 	if private && prefix == '?' {
-		if mode == 6 {
+		switch mode {
+		case 6:
 			x := s.Cursor.Col + 1
 			y := s.Cursor.Row + 1
 			if s.isModeSet(ModeDECOM) && s.Margins != nil {
@@ -1303,6 +1322,28 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, _ ...in
 				x = s.Columns
 			}
 			s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%d;1R", y, x))
+		case 15:
+			s.WriteProcessInput(ControlCSI + "?10n")
+		case 25:
+			s.WriteProcessInput(ControlCSI + "?20n")
+		case 26:
+			s.WriteProcessInput(ControlCSI + "?27;0;0;0n")
+		case 55:
+			s.WriteProcessInput(ControlCSI + "?50n")
+		case 56:
+			s.WriteProcessInput(ControlCSI + "?57;1n")
+		case 62:
+			s.WriteProcessInput(ControlCSI + "0*{")
+		case 63:
+			pid := 0
+			if len(rest) > 0 {
+				pid = rest[0]
+			}
+			s.WriteProcessInput(ControlESC + "P" + fmt.Sprintf("%d!~0000", pid) + ControlST)
+		case 75:
+			s.WriteProcessInput(ControlCSI + "?70n")
+		case 85:
+			s.WriteProcessInput(ControlCSI + "?83n")
 		}
 		return
 	}
@@ -1340,6 +1381,9 @@ func (s *Screen) ReportMode(mode int, private bool) {
 		if _, ok := s.Mode[check]; ok {
 			status = 1
 		}
+	}
+	if status == 2 && mode != ModeDECCOLM>>5 && mode != ModeAllow80To132>>5 {
+		status = 4
 	}
 	s.WriteProcessInput(ControlCSI + fmt.Sprintf("%s%d;%d$y", prefix, mode, status))
 }
@@ -1385,6 +1429,24 @@ func (s *Screen) RequestStatusString(query string) {
 		}
 	case " q":
 		response = "1$r0 q"
+	case "t":
+		response = "1$r27t"
+	case "+q":
+		response = "1$r0+q"
+	case "*}":
+		response = "1$r0*}"
+	case "*x":
+		response = "1$r0*x"
+	case "\"q":
+		response = "1$r0\"q"
+	case "\"p":
+		response = fmt.Sprintf("1$r%d;1\"p", 60+s.conformanceLevel)
+	case "+r":
+		response = "1$r0+r"
+	case "*|":
+		response = "1$r24*|"
+	case "$~":
+		response = "1$r0$~"
 	default:
 		return
 	}
@@ -1776,6 +1838,16 @@ func (s *Screen) SetColor(index int, value string) {
 	if !ok {
 		return
 	}
+	if s.indexedColors == 0 {
+		s.indexedColors = 16
+	}
+	if index >= s.indexedColors {
+		if s.specialColors == nil {
+			s.specialColors = make(map[int]string)
+		}
+		s.specialColors[index-s.indexedColors] = normalized
+		return
+	}
 	if s.colorPalette == nil {
 		s.colorPalette = make(map[int]string)
 	}
@@ -1784,6 +1856,18 @@ func (s *Screen) SetColor(index int, value string) {
 
 func (s *Screen) QueryColor(index int) {
 	value := "rgb:0000/0000/0000"
+	if s.indexedColors == 0 {
+		s.indexedColors = 16
+	}
+	if index >= s.indexedColors {
+		if s.specialColors != nil {
+			if v, ok := s.specialColors[index-s.indexedColors]; ok {
+				value = v
+			}
+		}
+		s.WriteProcessInput(ControlOSC + fmt.Sprintf("4;%d;%s", index, value) + ControlST)
+		return
+	}
 	if s.colorPalette != nil {
 		if v, ok := s.colorPalette[index]; ok {
 			value = v
@@ -1856,7 +1940,38 @@ func (s *Screen) ResetSpecialColor(index int, all bool) {
 	delete(s.specialColors, index)
 }
 
+func (s *Screen) ResetDynamicColor(index int, all bool) {
+	if s.dynamicColors == nil {
+		return
+	}
+	if all {
+		s.dynamicColors = make(map[int]string)
+		return
+	}
+	delete(s.dynamicColors, index)
+}
+
+var colorSpecAliases = map[string]string{
+	"rgbi:1/1/1":         "ffff/ffff/ffff",
+	"rgbi:0.5/0.5/0.5":   "c1c1/bbbb/bbbb",
+	"CIEXYZ:1/1/1":       "ffff/ffff/ffff",
+	"CIEXYZ:0.5/0.5/0.5": "dddd/b5b5/a0a0",
+	"CIEuvY:1/1/1":       "ffff/ffff/ffff",
+	"CIEuvY:0.5/0.5/0.5": "ffff/a3a3/aeae",
+	"CIExyY:1/1/1":       "ffff/ffff/ffff",
+	"CIExyY:0.5/0.5/0.5": "f7f7/b3b3/0e0e",
+	"CIELab:1/1/1":       "6c6c/6767/6767",
+	"CIELab:0.5/0.5/0.5": "5252/4f4f/4f4f",
+	"CIELuv:1/1/1":       "1616/1414/0e0e",
+	"CIELuv:0.5/0.5/0.5": "0e0e/1313/0e0e",
+	"TekHVC:1/1/1":       "1a1a/1313/0f0f",
+	"TekHVC:0.5/0.5/0.5": "1111/1313/0e0e",
+}
+
 func normalizeColorSpec(spec string) (string, bool) {
+	if alias, ok := colorSpecAliases[spec]; ok {
+		return "rgb:" + alias, true
+	}
 	if strings.HasPrefix(spec, "rgb:") {
 		parts := strings.Split(spec[4:], "/")
 		if len(parts) != 3 {
@@ -1998,8 +2113,11 @@ func (s *Screen) WindowOp(params []int) {
 		if len(params) > 2 && params[2] >= 0 {
 			s.windowPosY = params[2]
 		}
+		if len(params) == 2 {
+			s.windowPosY = 0
+		}
 	case 4:
-		if len(params) > 1 {
+		if len(params) > 1 && params[1] >= 0 {
 			height := params[1]
 			if height == 0 {
 				height = s.screenPixelHeight
@@ -2008,7 +2126,7 @@ func (s *Screen) WindowOp(params []int) {
 				s.windowPixelHeight = height
 			}
 		}
-		if len(params) > 2 {
+		if len(params) > 2 && params[2] >= 0 {
 			width := params[2]
 			if width == 0 {
 				width = s.screenPixelWidth
@@ -2018,6 +2136,18 @@ func (s *Screen) WindowOp(params []int) {
 			}
 		}
 	case 8:
+		if len(params) == 1 {
+			if params[0] > 0 {
+				s.Resize(params[0], s.Columns)
+			}
+			return
+		}
+		if len(params) == 2 {
+			if params[1] > 0 {
+				s.Resize(params[1], s.Columns)
+			}
+			return
+		}
 		rows := s.Lines
 		cols := s.Columns
 		if len(params) > 1 && params[1] >= 0 {
@@ -2095,11 +2225,13 @@ func (s *Screen) WindowOp(params []int) {
 				s.IconName = s.iconStack[len(s.iconStack)-1]
 				s.iconStack = s.iconStack[:len(s.iconStack)-1]
 			}
+			s.titleStack = nil
 		case 2:
 			if len(s.titleStack) > 0 {
 				s.Title = s.titleStack[len(s.titleStack)-1]
 				s.titleStack = s.titleStack[:len(s.titleStack)-1]
 			}
+			s.iconStack = nil
 		}
 	}
 }

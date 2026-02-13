@@ -89,13 +89,14 @@ type EventHandler interface {
 	SetSpecialColor(index int, value string)
 	QuerySpecialColor(index int)
 	ResetSpecialColor(index int, all bool)
+	ResetDynamicColor(index int, all bool)
 	SetTitleMode(params []int, reset bool)
 	SetConformance(level int, sevenBit int)
 	WindowOp(params []int)
 }
 
 type Stream struct {
-	listener   EventHandler
+	listener        EventHandler
 	strict          bool
 	useUTF8         bool
 	use8BitControls bool
@@ -110,6 +111,7 @@ type Stream struct {
 	skipNext        bool
 	dcsData         string
 	paramStrings    []string
+	escapeOverrides map[rune]func()
 }
 
 type parserState int
@@ -128,7 +130,6 @@ const (
 	stateEscapePercent
 	stateEscapeSpace
 )
-
 
 func NewStream(screen EventHandler, strict bool) *Stream {
 	st := &Stream{strict: strict, useUTF8: true}
@@ -339,6 +340,12 @@ func (st *Stream) handleGround(ch rune) error {
 
 func (st *Stream) handleEscape(ch rune) error {
 	st.state = stateGround
+	if st.escapeOverrides != nil {
+		if handler, ok := st.escapeOverrides[ch]; ok {
+			handler()
+			return nil
+		}
+	}
 	switch ch {
 	case '[':
 		st.state = stateCSI
@@ -588,20 +595,32 @@ func (st *Stream) finishOSC() {
 			spec := chunks[1]
 			if spec == "?" {
 				st.listener.QueryDynamicColor(idx)
+				if option == "10" && len(chunks) > 2 && chunks[2] == "?" {
+					st.listener.QueryDynamicColor(11)
+				}
 				break
 			}
 			st.listener.SetDynamicColor(idx, spec)
-		}
-	case "5":
-		if len(chunks) > 2 {
-			idx, err := strconv.Atoi(chunks[1])
-			if err != nil {
-				break
+			if option == "10" && len(chunks) > 2 {
+				st.listener.SetDynamicColor(11, chunks[2])
 			}
-			spec := chunks[2]
+		}
+	case "110", "111", "112", "113", "114", "115", "116", "117", "118", "119":
+		idx, err := strconv.Atoi(option)
+		if err != nil {
+			break
+		}
+		st.listener.ResetDynamicColor(idx-100, false)
+	case "5":
+		for i := 1; i+1 < len(chunks); i += 2 {
+			idx, err := strconv.Atoi(chunks[i])
+			if err != nil {
+				continue
+			}
+			spec := chunks[i+1]
 			if spec == "?" {
 				st.listener.QuerySpecialColor(idx)
-				break
+				continue
 			}
 			st.listener.SetSpecialColor(idx, spec)
 		}
@@ -610,7 +629,14 @@ func (st *Stream) finishOSC() {
 			st.listener.ResetSpecialColor(0, true)
 			break
 		}
-		if idx, err := strconv.Atoi(chunks[1]); err == nil {
+		for i := 1; i < len(chunks); i++ {
+			if chunks[i] == "" {
+				continue
+			}
+			idx, err := strconv.Atoi(chunks[i])
+			if err != nil {
+				continue
+			}
 			st.listener.ResetSpecialColor(idx, false)
 		}
 	}
@@ -782,15 +808,7 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			return
 		}
 		if final == 't' {
-			paramsWithOmitted := make([]int, len(params))
-			for i, p := range params {
-				if i < len(st.paramStrings) && st.paramStrings[i] == "" {
-					paramsWithOmitted[i] = -1
-				} else {
-					paramsWithOmitted[i] = p
-				}
-			}
-			st.listener.WindowOp(paramsWithOmitted)
+			st.listener.WindowOp(params)
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'p' {
