@@ -33,6 +33,7 @@ const (
 	esctestModeReverseWrapExtend = 1045
 	esctestModeAllow80To132      = 40
 	esctestModeAltBuf            = 47
+	esctestModeSaveRestoreCursor = 1048
 	esctestModeDECRLM            = 34
 	esctestXtermReverseWrap      = 383
 
