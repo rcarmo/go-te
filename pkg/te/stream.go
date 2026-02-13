@@ -673,6 +673,17 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		st.listener.EraseCharacters(params...)
 	case 'I':
 		st.listener.CursorForwardTab(params...)
+	case 'Z':
+		if len(params) <= 1 {
+			st.listener.CursorBackTab(params...)
+			return
+		}
+		args := make([]interface{}, len(params))
+		for i, v := range params {
+			args[i] = v
+		}
+		st.listener.Debug(args...)
+		return
 	case 'S':
 		st.listener.ScrollUp(params...)
 	case 'T':

@@ -58,6 +58,26 @@ func esctestNEL(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscNEL)
 }
 
+func esctestHTS(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscHTS)
+}
+
+func esctestTBC(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+EscTBC)
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscTBC))
+}
+
+func esctestCBT(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"Z")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sZ", ControlCSI, esctestJoinParams(params...)))
+}
+
 func esctestWrite(t *testing.T, stream *Stream, data string) {
 	if err := stream.Feed(data); err != nil {
 		t.Fatalf("feed: %v", err)
