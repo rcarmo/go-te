@@ -51,6 +51,31 @@ func esctestCUPParams(t *testing.T, stream *Stream, row, col *int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, strings.Join(params, ";"), EscCUP))
 }
 
+func esctestHVPParams(t *testing.T, stream *Stream, row, col *int) {
+	if row == nil && col == nil {
+		esctestWrite(t, stream, ControlCSI+EscHVP)
+		return
+	}
+	params := []string{}
+	if row == nil {
+		params = append(params, "")
+	} else {
+		params = append(params, fmt.Sprintf("%d", *row))
+	}
+	if col != nil {
+		params = append(params, fmt.Sprintf("%d", *col))
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, strings.Join(params, ";"), EscHVP))
+}
+
+func esctestCHT(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"I")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sI", ControlCSI, esctestJoinParams(params...)))
+}
+
 func esctestDECSET(t *testing.T, stream *Stream, modes ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s?%sh", ControlCSI, esctestJoinParams(modes...)))
 }
