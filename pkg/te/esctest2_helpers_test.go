@@ -27,16 +27,18 @@ type esctestRect struct {
 const (
 	esctestModeDECOM             = 6
 	esctestModeDECAWM            = 7
+	esctestModeIRM               = 4
 	esctestModeDECLRMM           = 69
 	esctestModeReverseWrapInline = 45
 	esctestModeReverseWrapExtend = 1045
 	esctestModeAllow80To132      = 40
 	esctestModeAltBuf            = 47
+	esctestModeDECRLM            = 34
 	esctestXtermReverseWrap      = 383
 
-	esctestTitleSetHex   = 0
-	esctestTitleQueryHex = 1
-	esctestTitleSetUTF8  = 2
+	esctestTitleSetHex    = 0
+	esctestTitleQueryHex  = 1
+	esctestTitleSetUTF8   = 2
 	esctestTitleQueryUTF8 = 3
 )
 
@@ -126,6 +128,14 @@ func esctestRIS(t *testing.T, stream *Stream) {
 	esctestWrite(t, stream, ControlESC+EscRIS)
 }
 
+func esctestDECSC(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscDECSC)
+}
+
+func esctestDECRC(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlESC+EscDECRC)
+}
+
 func esctestReverseWraparoundMode() int {
 	if esctestXtermReverseWrap >= 383 {
 		return esctestModeReverseWrapExtend
@@ -171,6 +181,50 @@ func esctestRMTitle(t *testing.T, stream *Stream, params ...int) {
 
 func esctestSMTitle(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s>%st", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestSM(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"h")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sh", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestRM(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"l")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%sl", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSTR(t *testing.T, stream *Stream) {
+	esctestWrite(t, stream, ControlCSI+"!p")
+}
+
+func esctestDECSASD(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"$}")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s$}", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSCA(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"\"q")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s%s\"q", ControlCSI, esctestJoinParams(params...)))
+}
+
+func esctestDECSED(t *testing.T, stream *Stream, params ...int) {
+	if len(params) == 0 {
+		esctestWrite(t, stream, ControlCSI+"?J")
+		return
+	}
+	esctestWrite(t, stream, fmt.Sprintf("%s?%sJ", ControlCSI, esctestJoinParams(params...)))
 }
 
 func esctestChangeWindowTitle(t *testing.T, stream *Stream, title string) {
