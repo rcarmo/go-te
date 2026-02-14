@@ -37,6 +37,7 @@ func main() {
 	}
 
 	screen := te.NewScreen(width, height)
+	screen.SetMode([]int{te.ModeLNM}, false)
 	stream := te.NewByteStream(screen, false)
 	if err := stream.Feed(data); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse capture data: %v\n", err)
