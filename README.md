@@ -132,6 +132,10 @@ Useful environment variables:
 
 The script uses `scripts/render_svg.go` to parse the captured pane output and export SVG via `te.RenderScreenSVG`.
 
+## WASM Usage
+
+`go-te` can be compiled to WebAssembly using either the Go toolchain (`GOOS=js GOARCH=wasm`) or TinyGo, making it suitable for browser-based terminal playback or screenshot tooling.
+
 ## Documentation
 
 - `docs/TEST_AUDIT_CHECKLIST.md` — test mapping status
