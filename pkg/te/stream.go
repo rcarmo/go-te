@@ -106,6 +106,7 @@ type Stream struct {
 	private         bool
 	csiPrefix       rune
 	csiIntermediate rune
+	pendingQuote    bool
 	takingText      bool
 	oscEsc          bool
 	skipNext        bool
@@ -147,6 +148,7 @@ func (st *Stream) Attach(screen EventHandler) {
 	st.private = false
 	st.csiPrefix = 0
 	st.csiIntermediate = 0
+	st.pendingQuote = false
 	st.dcsData = ""
 	st.takingText = false
 	st.oscEsc = false
@@ -224,6 +226,13 @@ func (st *Stream) FeedBytes(data []byte) (err error) {
 			return err
 		}
 		i += size
+	}
+	if st.state == stateCSI && st.pendingQuote {
+		st.pendingQuote = false
+		params := st.params
+		st.state = stateGround
+		st.dispatchCSI('\'', params)
+		st.resetCSI()
 	}
 	flush()
 	return nil
@@ -409,6 +418,21 @@ func (st *Stream) handleEscape(ch rune) error {
 }
 
 func (st *Stream) handleCSI(ch rune) error {
+	if st.pendingQuote {
+		st.pendingQuote = false
+		if ch == '}' || ch == '~' {
+			params := st.params
+			st.state = stateGround
+			st.dispatchCSI(ch, params)
+			st.resetCSI()
+			return nil
+		}
+		params := st.params
+		st.state = stateGround
+		st.dispatchCSI('\'', params)
+		st.resetCSI()
+		return st.handleGround(ch)
+	}
 	if ch == '?' {
 		st.private = true
 		st.csiPrefix = ch
@@ -420,9 +444,8 @@ func (st *Stream) handleCSI(ch rune) error {
 	}
 	if ch == '\'' {
 		st.appendParam()
-		params := st.params
-		st.state = stateGround
-		st.dispatchCSI(ch, params)
+		st.csiIntermediate = ch
+		st.pendingQuote = true
 		return nil
 	}
 	if ch >= ' ' && ch <= '/' {
@@ -555,8 +578,12 @@ func (st *Stream) finishOSC() {
 		st.listener.SetTitle(rest)
 	case "52":
 		selection := "s0"
-		if len(chunks) > 1 && chunks[1] != "" {
+		if len(chunks) > 1 && chunks[1] != "" && chunks[1] != "?" {
 			selection = chunks[1]
+		}
+		if len(chunks) == 2 && chunks[1] == "?" {
+			st.listener.QuerySelectionData(selection)
+			return
 		}
 		if len(chunks) > 2 {
 			if chunks[2] == "?" {
@@ -650,6 +677,7 @@ func (st *Stream) resetCSI() {
 	st.private = false
 	st.csiPrefix = 0
 	st.csiIntermediate = 0
+	st.pendingQuote = false
 }
 
 func (st *Stream) appendParam() {
@@ -697,6 +725,12 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		}
 		if how == 3 && !st.private {
 			return
+		}
+		if st.private {
+			if handler, ok := st.listener.(interface{ EraseInDisplaySelective(int) }); ok {
+				handler.EraseInDisplaySelective(how)
+				return
+			}
 		}
 		st.listener.EraseInDisplay(how, st.private, rest...)
 	case 'K':
@@ -787,7 +821,7 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 	case 'u':
 		st.listener.RestoreCursorDEC()
 	case '\'':
-		st.listener.CursorToColumn(params...)
+		st.listener.CursorToColumnAbsolute(params...)
 	default:
 		if st.csiPrefix == '>' && final == 't' {
 			st.listener.SetTitleMode(params, false)
@@ -805,6 +839,12 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 		}
 		if st.csiIntermediate == '"' && final == 'q' {
 			st.listener.SetCharacterProtection(defaultParam(params, 0, 0))
+			return
+		}
+		if st.csiIntermediate == ' ' && final == 'q' {
+			if handler, ok := st.listener.(interface{ SetCursorStyle(int) }); ok {
+				handler.SetCursorStyle(defaultParam(params, 0, 0))
+			}
 			return
 		}
 		if final == 't' {
@@ -827,30 +867,37 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 			st.listener.DeleteColumns(defaultParam(params, 0, 1))
 			return
 		}
+		if st.csiIntermediate == '$' && final == '}' {
+			if handler, ok := st.listener.(interface{ SetActiveStatusDisplay(int) }); ok {
+				handler.SetActiveStatusDisplay(defaultParam(params, 0, 0))
+			}
+			return
+		}
 		if st.csiIntermediate == '$' && final == 'z' {
-			st.listener.EraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
+			st.listener.EraseRectangle(defaultParam(params, 0, 0), defaultParam(params, 1, 0), defaultParam(params, 2, 0), defaultParam(params, 3, 0))
 			return
 		}
 		if st.csiIntermediate == '$' && final == '{' {
-			st.listener.SelectiveEraseRectangle(defaultParam(params, 0, 1), defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1))
+			st.listener.SelectiveEraseRectangle(defaultParam(params, 0, 0), defaultParam(params, 1, 0), defaultParam(params, 2, 0), defaultParam(params, 3, 0))
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'x' {
 			ch := rune(defaultParam(params, 0, 0))
-			st.listener.FillRectangle(ch, defaultParam(params, 1, 1), defaultParam(params, 2, 1), defaultParam(params, 3, 1), defaultParam(params, 4, 1))
+			st.listener.FillRectangle(ch, defaultParam(params, 1, 0), defaultParam(params, 2, 0), defaultParam(params, 3, 0), defaultParam(params, 4, 0))
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'v' {
-			srcTop := defaultParam(params, 0, 1)
-			srcLeft := defaultParam(params, 1, 1)
-			srcBottom := defaultParam(params, 2, 1)
-			srcRight := defaultParam(params, 3, 1)
-			dstTop := defaultParam(params, 5, 1)
-			dstLeft := defaultParam(params, 6, 1)
+			srcTop := defaultParam(params, 0, 0)
+			srcLeft := defaultParam(params, 1, 0)
+			srcBottom := defaultParam(params, 2, 0)
+			srcRight := defaultParam(params, 3, 0)
+			dstTop := defaultParam(params, 5, 0)
+			dstLeft := defaultParam(params, 6, 0)
 			st.listener.CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft)
 			return
 		}
 		if st.csiIntermediate == '$' && final == 'y' {
+			st.listener.ReportMode(defaultParam(params, 0, 0), st.private)
 			return
 		}
 		args := make([]interface{}, len(params))

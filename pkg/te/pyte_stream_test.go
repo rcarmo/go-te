@@ -111,24 +111,34 @@ func TestPyteTestStreamNonCSISequences(t *testing.T) {
 		{EscCPL, func(m *mockScreen, a *streamArgCheck) { m.cursorUp1 = func(count ...int) { a.Call(count...) } }},
 		{EscCHA, func(m *mockScreen, a *streamArgCheck) { m.cursorToColumn = func(col ...int) { a.Call(col...) } }},
 		{EscCUP, func(m *mockScreen, a *streamArgCheck) { m.cursorPosition = func(params ...int) { a.Call(params...) } }},
-		{EscED, func(m *mockScreen, a *streamArgCheck) { m.eraseInDisplay = func(how int, _ bool, rest ...int) { args := append([]int{how}, rest...); a.Call(args...) } }},
-		{EscEL, func(m *mockScreen, a *streamArgCheck) { m.eraseInLine = func(how int, _ bool, rest ...int) { args := append([]int{how}, rest...); a.Call(args...) } }},
+		{EscED, func(m *mockScreen, a *streamArgCheck) {
+			m.eraseInDisplay = func(how int, _ bool, rest ...int) { args := append([]int{how}, rest...); a.Call(args...) }
+		}},
+		{EscEL, func(m *mockScreen, a *streamArgCheck) {
+			m.eraseInLine = func(how int, _ bool, rest ...int) { args := append([]int{how}, rest...); a.Call(args...) }
+		}},
 		{EscIL, func(m *mockScreen, a *streamArgCheck) { m.insertLines = func(count ...int) { a.Call(count...) } }},
 		{EscDL, func(m *mockScreen, a *streamArgCheck) { m.deleteLines = func(count ...int) { a.Call(count...) } }},
 		{EscDCH, func(m *mockScreen, a *streamArgCheck) { m.deleteCharacters = func(count ...int) { a.Call(count...) } }},
 		{EscECH, func(m *mockScreen, a *streamArgCheck) { m.eraseCharacters = func(count ...int) { a.Call(count...) } }},
 		{EscHPR, func(m *mockScreen, a *streamArgCheck) { m.cursorForward = func(count ...int) { a.Call(count...) } }},
-		{EscDA, func(m *mockScreen, a *streamArgCheck) { m.reportDeviceAttrs = func(mode int, _ bool, _ rune, rest ...int) { args := append([]int{mode}, rest...); a.Call(args...) } }},
+		{EscDA, func(m *mockScreen, a *streamArgCheck) {
+			m.reportDeviceAttrs = func(mode int, _ bool, _ rune, rest ...int) { args := append([]int{mode}, rest...); a.Call(args...) }
+		}},
 		{EscVPA, func(m *mockScreen, a *streamArgCheck) { m.cursorToLine = func(line ...int) { a.Call(line...) } }},
 		{EscVPR, func(m *mockScreen, a *streamArgCheck) { m.cursorDown = func(count ...int) { a.Call(count...) } }},
 		{EscHVP, func(m *mockScreen, a *streamArgCheck) { m.cursorPosition = func(params ...int) { a.Call(params...) } }},
 		{EscTBC, func(m *mockScreen, a *streamArgCheck) { m.clearTabStop = func(how ...int) { a.Call(how...) } }},
 		{EscSM, func(m *mockScreen, a *streamArgCheck) { m.setMode = func(modes []int, _ bool) { a.Call(modes...) } }},
 		{EscRM, func(m *mockScreen, a *streamArgCheck) { m.resetMode = func(modes []int, _ bool) { a.Call(modes...) } }},
-		{EscSGR, func(m *mockScreen, a *streamArgCheck) { m.selectGraphic = func(attrs []int, _ bool) { a.Call(attrs...) } }},
-		{EscDSR, func(m *mockScreen, a *streamArgCheck) { m.reportDeviceStatus = func(mode int, _ bool, _ rune, rest ...int) { args := append([]int{mode}, rest...); a.Call(args...) } }},
+		{EscSGR, func(m *mockScreen, a *streamArgCheck) {
+			m.selectGraphic = func(attrs []int, _ bool) { a.Call(attrs...) }
+		}},
+		{EscDSR, func(m *mockScreen, a *streamArgCheck) {
+			m.reportDeviceStatus = func(mode int, _ bool, _ rune, rest ...int) { args := append([]int{mode}, rest...); a.Call(args...) }
+		}},
 		{EscDECSTBM, func(m *mockScreen, a *streamArgCheck) { m.setMargins = func(params ...int) { a.Call(params...) } }},
-		{EscHPA, func(m *mockScreen, a *streamArgCheck) { m.cursorToColumn = func(col ...int) { a.Call(col...) } }},
+		{EscHPA, func(m *mockScreen, a *streamArgCheck) { m.cursorToColumnAbs = func(col ...int) { a.Call(col...) } }},
 	}
 
 	for _, tc := range cases {

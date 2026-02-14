@@ -9,7 +9,7 @@ func esctestGetVTLevel(t *testing.T, screen *Screen) int {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceAttributes(0, false, '>', 0)
 	})
-	params := esctestReadCSI(t, response, 'c', '>')
+	params := esctestReadCSI(t, response, "c", '>')
 	if len(params) == 0 {
 		return 0
 	}
@@ -32,7 +32,7 @@ func TestEsctestDecdsrTestDecdsrDecxcpr(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(6, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'R', '?')
+	params := esctestReadCSI(t, response, "R", '?')
 	if level >= 4 {
 		esctestAssertEQ(t, params, []int{6, 5, 1})
 	} else {
@@ -46,7 +46,7 @@ func TestEsctestDecdsrTestDecdsrDsrPrinterPort(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(15, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}
@@ -62,7 +62,7 @@ func TestEsctestDecdsrTestDecdsrDsrUDKLocked(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(25, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}
@@ -79,7 +79,7 @@ func TestEsctestDecdsrTestDecdsrDsrKeyboard(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(26, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if level <= 2 {
 		if len(params) != 2 {
 			t.Fatalf("expected 2 params, got %d", len(params))
@@ -120,7 +120,7 @@ func esctestDoLocatorStatusTest(t *testing.T, screen *Screen, code int) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(code, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}
@@ -148,7 +148,7 @@ func TestEsctestDecdsrTestDecdsrLocatorType(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(56, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if params[0] != 57 {
 		t.Fatalf("expected 57, got %d", params[0])
 	}
@@ -164,7 +164,7 @@ func TestEsctestDecdsrTestDecdsrDecmsr(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(62, true, '?')
 	})
-	params := esctestReadCSI(t, response, '{', 0)
+	params := esctestReadCSI(t, response, "*{", 0)
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}
@@ -188,7 +188,7 @@ func TestEsctestDecdsrTestDecdsrDsrDataIntegrity(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(75, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}
@@ -201,7 +201,7 @@ func TestEsctestDecdsrTestDecdsrDsrMultipleSessionStatus(t *testing.T) {
 	response := esctestCaptureResponse(screen, func() {
 		screen.ReportDeviceStatus(85, true, '?')
 	})
-	params := esctestReadCSI(t, response, 'n', '?')
+	params := esctestReadCSI(t, response, "n", '?')
 	if len(params) != 1 {
 		t.Fatalf("expected 1 param, got %d", len(params))
 	}

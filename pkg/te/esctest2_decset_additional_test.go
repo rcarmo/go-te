@@ -64,7 +64,7 @@ func TestEsctestDecsetTestDecsetDecomDecrqcra(t *testing.T) {
 	esctestDECSET(t, fixture.stream, esctestModeDECLRMM)
 	esctestDECSLRM(t, fixture.stream, 5, 7)
 	esctestDECSET(t, fixture.stream, esctestModeDECOM)
-	esctestAssertScreenCharsInRectEqual(t, fixture.screen, esctestRect{Left: 1, Top: 1, Right: 1, Bottom: 1}, []string{"X"})
+	esctestAssertScreenCharsInRectEqual(t, fixture.screen, esctestRect{Left: 5, Top: 5, Right: 5, Bottom: 5}, []string{"X"})
 }
 
 // From esctest2/esctest/tests/decset.py::test_DECSET_DECLRMM

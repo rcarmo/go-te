@@ -28,47 +28,51 @@ type Savepoint struct {
 }
 
 type Screen struct {
-	Columns           int
-	Lines             int
-	Buffer            [][]Cell
-	Dirty             map[int]struct{}
-	Cursor            Cursor
-	Mode              map[int]struct{}
-	Margins           *Margins
-	Charset           int
-	G0                []rune
-	G1                []rune
-	TabStops          map[int]struct{}
-	Title             string
-	IconName          string
-	Savepoints        []Savepoint
-	SavedColumns      *int
-	WriteProcessInput func(string)
-	lastDrawn         string
-	leftMargin        int
-	rightMargin       int
-	lineWrapped       map[int]bool
-	wrapNext          bool
-	savedModes        map[int]bool
-	selectionData     map[string]string
-	colorPalette      map[int]string
-	dynamicColors     map[int]string
-	specialColors     map[int]string
-	titleHexInput     bool
-	titleHexOutput    bool
-	conformanceLevel  int
-	titleStack        []string
-	iconStack         []string
-	windowPosX        int
-	windowPosY        int
-	windowPixelWidth  int
-	windowPixelHeight int
-	screenPixelWidth  int
-	screenPixelHeight int
-	charPixelWidth    int
-	charPixelHeight   int
-	windowIconified   bool
-	indexedColors     int
+	Columns             int
+	Lines               int
+	Buffer              [][]Cell
+	Dirty               map[int]struct{}
+	Cursor              Cursor
+	Mode                map[int]struct{}
+	Margins             *Margins
+	Charset             int
+	G0                  []rune
+	G1                  []rune
+	TabStops            map[int]struct{}
+	Title               string
+	IconName            string
+	cursorStyle         int
+	charProtectionMode  int
+	statusDisplay       int
+	Savepoints          []Savepoint
+	SavedColumns        *int
+	WriteProcessInput   func(string)
+	lastDrawn           string
+	leftMargin          int
+	rightMargin         int
+	lineWrapped         map[int]bool
+	wrapNext            bool
+	savedModes          map[int]bool
+	selectionData       map[string]string
+	colorPalette        map[int]string
+	dynamicColors       map[int]string
+	specialColors       map[int]string
+	titleHexInput       bool
+	titleHexOutput      bool
+	conformanceLevel    int
+	conformanceExplicit bool
+	titleStack          []string
+	iconStack           []string
+	windowPosX          int
+	windowPosY          int
+	windowPixelWidth    int
+	windowPixelHeight   int
+	screenPixelWidth    int
+	screenPixelHeight   int
+	charPixelWidth      int
+	charPixelHeight     int
+	windowIconified     bool
+	indexedColors       int
 
 	altBuffer      [][]Cell
 	altSavepoints  []Savepoint
@@ -128,6 +132,10 @@ func (s *Screen) Reset() {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 1
+	s.conformanceExplicit = false
+	s.cursorStyle = 0
+	s.charProtectionMode = 0
+	s.statusDisplay = 0
 	s.titleStack = nil
 	s.iconStack = nil
 	if s.charPixelWidth == 0 {
@@ -242,6 +250,10 @@ func (s *Screen) Resize(lines, columns int) {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 1
+	s.conformanceExplicit = false
+	s.cursorStyle = 0
+	s.charProtectionMode = 0
+	s.statusDisplay = 0
 	s.titleStack = nil
 	s.iconStack = nil
 	if s.charPixelWidth == 0 {
@@ -634,12 +646,23 @@ func (s *Screen) InsertCharacters(params ...int) {
 	if s.Cursor.Col < left || s.Cursor.Col > right {
 		return
 	}
+	top, bottom := s.scrollRegion()
+	if s.isModeSet(ModeDECLRMM) {
+		if s.Cursor.Row < top || s.Cursor.Row > bottom {
+			return
+		}
+	}
+	maxCount := right - s.Cursor.Col + 1
+	if count > maxCount {
+		count = maxCount
+	}
+	if count <= 0 {
+		return
+	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
-	for col := right; col >= s.Cursor.Col; col-- {
-		if col+count <= right {
-			line[col+count] = line[col]
-		}
+	for col := right; col >= s.Cursor.Col+count; col-- {
+		line[col] = line[col-count]
 	}
 	for col := s.Cursor.Col; col < s.Cursor.Col+count && col <= right; col++ {
 		line[col] = s.defaultCell()
@@ -658,14 +681,26 @@ func (s *Screen) DeleteCharacters(params ...int) {
 	if s.Cursor.Col < left || s.Cursor.Col > right {
 		return
 	}
+	top, bottom := s.scrollRegion()
+	if s.isModeSet(ModeDECLRMM) {
+		if s.Cursor.Row < top || s.Cursor.Row > bottom {
+			return
+		}
+	}
+	maxCount := right - s.Cursor.Col + 1
+	if count > maxCount {
+		count = maxCount
+	}
+	if count <= 0 {
+		return
+	}
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
-	for col := s.Cursor.Col; col <= right; col++ {
-		if col+count <= right {
-			line[col] = line[col+count]
-		} else {
-			line[col] = s.defaultCell()
-		}
+	for col := s.Cursor.Col; col <= right-count; col++ {
+		line[col] = line[col+count]
+	}
+	for col := right - count + 1; col <= right; col++ {
+		line[col] = s.defaultCell()
 	}
 }
 
@@ -689,7 +724,7 @@ func (s *Screen) EraseCharacters(params ...int) {
 		if line[col].Attr.ISOProtected {
 			continue
 		}
-		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
+		line[col] = Cell{Data: " ", Attr: s.defaultAttr()}
 	}
 }
 
@@ -711,15 +746,30 @@ func (s *Screen) EraseInLine(how int, private bool, _ ...int) {
 		end = right + 1
 	}
 	for col := start; col < end; col++ {
-		if line[col].Attr.ISOProtected {
+		protected := line[col].Attr.ISOProtected
+		if private {
+			protected = line[col].Attr.Protected
+		}
+		if protected {
 			continue
 		}
-		line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
+		line[col] = Cell{Data: " ", Attr: s.defaultAttr()}
 	}
 }
 
 func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
+	s.eraseInDisplay(how, private, false)
+}
+
+func (s *Screen) EraseInDisplaySelective(how int) {
+	s.eraseInDisplay(how, true, true)
+}
+
+func (s *Screen) eraseInDisplay(how int, private bool, selective bool) {
 	if how == 3 {
+		if selective {
+			return
+		}
 		how = 2
 	}
 	var start, end int
@@ -735,15 +785,19 @@ func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
 		end = s.Lines
 	}
 	if how == 0 || how == 1 {
-		s.EraseInLine(how, false)
+		s.EraseInLine(how, private)
 	}
 	for row := start; row < end; row++ {
 		line := s.Buffer[row]
 		for col := 0; col < s.Columns; col++ {
-			if line[col].Attr.ISOProtected {
+			protected := line[col].Attr.ISOProtected
+			if private {
+				protected = line[col].Attr.Protected
+			}
+			if protected {
 				continue
 			}
-			line[col] = Cell{Data: " ", Attr: s.Cursor.Attr}
+			line[col] = Cell{Data: " ", Attr: s.defaultAttr()}
 		}
 		s.Dirty[row] = struct{}{}
 	}
@@ -765,11 +819,16 @@ func (s *Screen) EndProtectedArea() {
 }
 
 func (s *Screen) SetCharacterProtection(mode int) {
-	if mode == 1 {
-		s.Cursor.Attr.Protected = true
-		return
-	}
-	s.Cursor.Attr.Protected = false
+	s.charProtectionMode = mode
+	s.Cursor.Attr.Protected = mode == 1
+}
+
+func (s *Screen) SetCursorStyle(style int) {
+	s.cursorStyle = style
+}
+
+func (s *Screen) SetActiveStatusDisplay(mode int) {
+	s.statusDisplay = mode
 }
 
 func (s *Screen) ClearTabStop(how ...int) {
@@ -1283,9 +1342,9 @@ func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune, _ .
 	case 4:
 		params = []int{64, 1, 2, 6, 9, 15, 16, 17, 18, 21, 22, 28, 29}
 	case 3:
-		params = []int{63, 1, 2, 6, 9, 15, 22, 29}
+		params = []int{63, 1, 2, 6, 9, 15, 16, 17, 18, 21, 22, 28, 29}
 	case 2:
-		params = []int{62, 1, 2, 6, 9, 15, 22, 29}
+		params = []int{61, 1, 2, 6, 9, 15, 22, 29}
 	case 1:
 		params = []int{6}
 	default:
@@ -1310,10 +1369,14 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ..
 			x := s.Cursor.Col + 1
 			y := s.Cursor.Row + 1
 			if s.isModeSet(ModeDECOM) && s.Margins != nil {
-				y -= s.Margins.Top
+				if s.Cursor.Row >= s.Margins.Top && s.Cursor.Row <= s.Margins.Bottom {
+					y -= s.Margins.Top
+				}
 			}
 			if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
-				x -= s.leftMargin
+				if s.Cursor.Col >= s.leftMargin && s.Cursor.Col <= s.rightMargin {
+					x -= s.leftMargin
+				}
 			}
 			if x < 1 {
 				x = 1
@@ -1321,19 +1384,30 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ..
 			if x > s.Columns {
 				x = s.Columns
 			}
-			s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%d;1R", y, x))
+			if s.conformanceLevel >= 4 {
+				s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%d;1R", y, x))
+			} else {
+				s.WriteProcessInput(ControlCSI + fmt.Sprintf("?%d;%dR", y, x))
+			}
 		case 15:
 			s.WriteProcessInput(ControlCSI + "?10n")
 		case 25:
 			s.WriteProcessInput(ControlCSI + "?20n")
 		case 26:
-			s.WriteProcessInput(ControlCSI + "?27;0;0;0n")
+			if s.conformanceLevel <= 2 {
+				s.WriteProcessInput(ControlCSI + "?27;0n")
+			} else if s.conformanceLevel == 3 {
+				s.WriteProcessInput(ControlCSI + "?27;0;0n")
+			} else {
+				s.WriteProcessInput(ControlCSI + "?27;0;0;0n")
+			}
 		case 55:
 			s.WriteProcessInput(ControlCSI + "?50n")
 		case 56:
 			s.WriteProcessInput(ControlCSI + "?57;1n")
 		case 62:
 			s.WriteProcessInput(ControlCSI + "0*{")
+			return
 		case 63:
 			pid := 0
 			if len(rest) > 0 {
@@ -1354,10 +1428,14 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ..
 		x := s.Cursor.Col + 1
 		y := s.Cursor.Row + 1
 		if s.isModeSet(ModeDECOM) && s.Margins != nil {
-			y -= s.Margins.Top
+			if s.Cursor.Row >= s.Margins.Top && s.Cursor.Row <= s.Margins.Bottom {
+				y -= s.Margins.Top
+			}
 		}
 		if s.isModeSet(ModeDECOM) && s.isModeSet(ModeDECLRMM) {
-			x -= s.leftMargin
+			if s.Cursor.Col >= s.leftMargin && s.Cursor.Col <= s.rightMargin {
+				x -= s.leftMargin
+			}
 		}
 		if x < 1 {
 			x = 1
@@ -1370,6 +1448,9 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ..
 }
 
 func (s *Screen) ReportMode(mode int, private bool) {
+	if s.conformanceExplicit && s.conformanceLevel < 3 {
+		return
+	}
 	check := mode
 	prefix := ""
 	if private {
@@ -1382,8 +1463,18 @@ func (s *Screen) ReportMode(mode int, private bool) {
 			status = 1
 		}
 	}
-	if status == 2 && mode != ModeDECCOLM>>5 && mode != ModeAllow80To132>>5 {
-		status = 4
+	if status == 2 {
+		if private {
+			switch mode {
+			case ModeDECHCCM >> 5:
+				status = 4
+			}
+		} else {
+			switch mode {
+			case 1, 5, 7, 10, 11, 13, 14, 15, 16, 17, 18, 19:
+				status = 4
+			}
+		}
 	}
 	s.WriteProcessInput(ControlCSI + fmt.Sprintf("%s%d;%d$y", prefix, mode, status))
 }
@@ -1428,23 +1519,25 @@ func (s *Screen) RequestStatusString(query string) {
 			response = fmt.Sprintf("1$r1;%ds", s.Columns)
 		}
 	case " q":
-		response = "1$r0 q"
+		response = fmt.Sprintf("1$r%d q", s.cursorStyle)
 	case "t":
 		response = "1$r27t"
 	case "+q":
 		response = "1$r0+q"
 	case "*}":
 		response = "1$r0*}"
+	case "$}":
+		response = fmt.Sprintf("1$r%d$}", s.statusDisplay)
 	case "*x":
 		response = "1$r0*x"
 	case "\"q":
-		response = "1$r0\"q"
+		response = fmt.Sprintf("1$r%d\"q", s.charProtectionMode)
 	case "\"p":
 		response = fmt.Sprintf("1$r%d;1\"p", 60+s.conformanceLevel)
 	case "+r":
 		response = "1$r0+r"
 	case "*|":
-		response = "1$r24*|"
+		response = fmt.Sprintf("1$r%d*|", s.Lines)
 	case "$~":
 		response = "1$r0$~"
 	default:
@@ -1473,6 +1566,10 @@ func (s *Screen) SoftReset() {
 	s.titleHexInput = false
 	s.titleHexOutput = false
 	s.conformanceLevel = 1
+	s.conformanceExplicit = false
+	s.cursorStyle = 0
+	s.charProtectionMode = 0
+	s.statusDisplay = 0
 	s.titleStack = nil
 	s.iconStack = nil
 }
@@ -1640,7 +1737,7 @@ func (s *Screen) SelectiveEraseRectangle(top, left, bottom, right int) {
 	for row := top - 1; row <= bottom-1; row++ {
 		for col := left - 1; col <= right-1; col++ {
 			cell := s.Buffer[row][col]
-			if cell.Attr.Protected || cell.Attr.ISOProtected {
+			if cell.Attr.Protected {
 				continue
 			}
 			s.Buffer[row][col] = Cell{Data: " ", Attr: s.defaultAttr()}
@@ -1744,7 +1841,12 @@ func (s *Screen) fillRectangle(top, left, bottom, right int, data string) {
 	}
 	for row := top - 1; row <= bottom-1; row++ {
 		for col := left - 1; col <= right-1; col++ {
-			s.Buffer[row][col] = Cell{Data: data, Attr: s.defaultAttr()}
+			cell := s.Buffer[row][col]
+			if cell.Attr.Protected {
+				continue
+			}
+			cell.Data = data
+			s.Buffer[row][col] = cell
 		}
 		s.Dirty[row] = struct{}{}
 	}
@@ -1768,6 +1870,16 @@ func (s *Screen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dst
 	}
 	if dstLeft <= 0 {
 		dstLeft = 1
+	}
+	if s.isModeSet(ModeDECOM) && s.Margins != nil {
+		srcTop += s.Margins.Top
+		srcBottom += s.Margins.Top
+		dstTop += s.Margins.Top
+		if s.isModeSet(ModeDECLRMM) {
+			srcLeft += s.leftMargin
+			srcRight += s.leftMargin
+			dstLeft += s.leftMargin
+		}
 	}
 	if srcTop > srcBottom || srcLeft > srcRight {
 		return
@@ -2093,7 +2205,9 @@ func (s *Screen) SetConformance(level int, sevenBit int) {
 		return
 	}
 	s.Reset()
+	s.Savepoints = nil
 	s.conformanceLevel = level
+	s.conformanceExplicit = true
 	_ = sevenBit
 }
 
@@ -2293,6 +2407,9 @@ func (s *Screen) SetMargins(params ...int) {
 }
 
 func (s *Screen) SetLeftRightMargins(left, right int) {
+	if !s.isModeSet(ModeDECLRMM) {
+		return
+	}
 	if (left == 0 || left == -1) && right == 0 {
 		s.leftMargin = 0
 		s.rightMargin = s.Columns - 1
@@ -2334,6 +2451,14 @@ func (s *Screen) applySetMode(mode int, private bool) {
 		s.Mode = make(map[int]struct{})
 	}
 	s.Mode[mode] = struct{}{}
+	if mode == ModeDECLRMM && s.conformanceExplicit && s.conformanceLevel < 4 {
+		delete(s.Mode, mode)
+		return
+	}
+	if mode == ModeDECNCSM && s.conformanceExplicit && s.conformanceLevel < 5 {
+		delete(s.Mode, mode)
+		return
+	}
 
 	if mode == ModeDECCOLM {
 		if !s.isModeSet(ModeAllow80To132) {
@@ -2342,7 +2467,9 @@ func (s *Screen) applySetMode(mode int, private bool) {
 		saved := s.Columns
 		s.SavedColumns = &saved
 		s.Resize(s.Lines, 132)
-		s.EraseInDisplay(2, false)
+		if !s.isModeSet(ModeDECNCSM) {
+			s.EraseInDisplay(2, false)
+		}
 		s.CursorPosition(0, 0)
 	}
 
@@ -2395,7 +2522,9 @@ func (s *Screen) applyResetMode(mode int, private bool) {
 			s.Resize(s.Lines, *s.SavedColumns)
 			s.SavedColumns = nil
 		}
-		s.EraseInDisplay(2, false)
+		if !s.isModeSet(ModeDECNCSM) {
+			s.EraseInDisplay(2, false)
+		}
 		s.CursorPosition(0, 0)
 	}
 

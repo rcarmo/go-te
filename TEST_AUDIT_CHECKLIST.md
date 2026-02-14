@@ -8,36 +8,37 @@
 - [x] vendor/pyte/tests/test_stream.py -> pkg/te/pyte_stream_test.go
 
 ## ESCTest2
-- [ ] vendor/esctest2/esctest/tests/apc.py -> pkg/te/esctest2_apc_test.go
-- [ ] vendor/esctest2/esctest/tests/bs.py -> pkg/te/esctest2_bs_test.go
-- [ ] vendor/esctest2/esctest/tests/cbt.py -> pkg/te/esctest2_cbt_test.go
-- [ ] vendor/esctest2/esctest/tests/cha.py -> pkg/te/esctest2_cha_test.go
+- [x] vendor/esctest2/esctest/tests/__init__.py -> (no tests)
+- [x] vendor/esctest2/esctest/tests/apc.py -> pkg/te/esctest2_apc_test.go
+- [x] vendor/esctest2/esctest/tests/bs.py -> pkg/te/esctest2_bs_test.go
+- [x] vendor/esctest2/esctest/tests/cbt.py -> pkg/te/esctest2_cbt_test.go
+- [x] vendor/esctest2/esctest/tests/cha.py -> pkg/te/esctest2_cha_test.go
 - [x] vendor/esctest2/esctest/tests/change_color.py -> pkg/te/esctest2_change_color_test.go
 - [x] vendor/esctest2/esctest/tests/change_dynamic_color.py -> pkg/te/esctest2_change_dynamic_color_test.go
 - [x] vendor/esctest2/esctest/tests/change_special_color.py -> pkg/te/esctest2_change_special_color_test.go
-- [ ] vendor/esctest2/esctest/tests/cht.py -> pkg/te/esctest2_cht_test.go
-- [ ] vendor/esctest2/esctest/tests/cnl.py -> pkg/te/esctest2_cnl_test.go
-- [ ] vendor/esctest2/esctest/tests/cpl.py -> pkg/te/esctest2_cpl_test.go
-- [ ] vendor/esctest2/esctest/tests/cr.py -> pkg/te/esctest2_cr_test.go
+- [x] vendor/esctest2/esctest/tests/cht.py -> pkg/te/esctest2_cht_test.go
+- [x] vendor/esctest2/esctest/tests/cnl.py -> pkg/te/esctest2_cnl_test.go
+- [x] vendor/esctest2/esctest/tests/cpl.py -> pkg/te/esctest2_cpl_test.go
+- [x] vendor/esctest2/esctest/tests/cr.py -> pkg/te/esctest2_cr_test.go
 - [x] vendor/esctest2/esctest/tests/cub.py -> pkg/te/esctest2_cub_test.go
-- [ ] vendor/esctest2/esctest/tests/cud.py -> pkg/te/esctest2_cud_test.go
-- [ ] vendor/esctest2/esctest/tests/cuf.py -> pkg/te/esctest2_cuf_test.go
-- [ ] vendor/esctest2/esctest/tests/cup.py -> pkg/te/esctest2_cup_test.go
-- [ ] vendor/esctest2/esctest/tests/cuu.py -> pkg/te/esctest2_cuu_test.go
-- [ ] vendor/esctest2/esctest/tests/da.py -> pkg/te/esctest2_da_test.go
-- [ ] vendor/esctest2/esctest/tests/da2.py -> pkg/te/esctest2_da2_test.go
-- [ ] vendor/esctest2/esctest/tests/dch.py -> pkg/te/esctest2_dch_test.go
-- [ ] vendor/esctest2/esctest/tests/dcs.py -> pkg/te/esctest2_dcs_test.go
-- [ ] vendor/esctest2/esctest/tests/decaln.py -> pkg/te/esctest2_decaln_test.go
-- [ ] vendor/esctest2/esctest/tests/decbi.py -> pkg/te/esctest2_decbi_test.go
+- [x] vendor/esctest2/esctest/tests/cud.py -> pkg/te/esctest2_cud_test.go
+- [x] vendor/esctest2/esctest/tests/cuf.py -> pkg/te/esctest2_cuf_test.go
+- [x] vendor/esctest2/esctest/tests/cup.py -> pkg/te/esctest2_cup_test.go
+- [x] vendor/esctest2/esctest/tests/cuu.py -> pkg/te/esctest2_cuu_test.go
+- [x] vendor/esctest2/esctest/tests/da.py -> pkg/te/esctest2_da_test.go
+- [x] vendor/esctest2/esctest/tests/da2.py -> pkg/te/esctest2_da2_test.go
+- [x] vendor/esctest2/esctest/tests/dch.py -> pkg/te/esctest2_dch_test.go
+- [x] vendor/esctest2/esctest/tests/dcs.py -> pkg/te/esctest2_dcs_test.go
+- [x] vendor/esctest2/esctest/tests/decaln.py -> pkg/te/esctest2_decaln_test.go
+- [x] vendor/esctest2/esctest/tests/decbi.py -> pkg/te/esctest2_decbi_test.go
 - [x] vendor/esctest2/esctest/tests/deccra.py -> pkg/te/esctest2_deccra_test.go
 - [x] vendor/esctest2/esctest/tests/decdc.py -> pkg/te/esctest2_decdc_test.go
 - [x] vendor/esctest2/esctest/tests/decdsr.py -> pkg/te/esctest2_decdsr_test.go
 - [x] vendor/esctest2/esctest/tests/decera.py -> pkg/te/esctest2_decera_test.go
-- [ ] vendor/esctest2/esctest/tests/decfi.py -> pkg/te/esctest2_decfi_test.go
+- [x] vendor/esctest2/esctest/tests/decfi.py -> pkg/te/esctest2_decfi_test.go
 - [x] vendor/esctest2/esctest/tests/decfra.py -> pkg/te/esctest2_decfra_test.go
 - [x] vendor/esctest2/esctest/tests/decic.py -> pkg/te/esctest2_decic_test.go
-- [ ] vendor/esctest2/esctest/tests/decid.py -> pkg/te/esctest2_decid_test.go
+- [x] vendor/esctest2/esctest/tests/decid.py -> pkg/te/esctest2_decid_test.go
 - [x] vendor/esctest2/esctest/tests/decrc.py -> pkg/te/esctest2_decrc_test.go
 - [x] vendor/esctest2/esctest/tests/decrectops.py -> pkg/te/esctest2_decrectops_test.go
 - [x] vendor/esctest2/esctest/tests/decrqm.py -> pkg/te/esctest2_decrqm_test.go
@@ -47,44 +48,43 @@
 - [x] vendor/esctest2/esctest/tests/decsel.py -> pkg/te/esctest2_decsel_test.go
 - [x] vendor/esctest2/esctest/tests/decsera.py -> pkg/te/esctest2_decsera_test.go
 - [x] vendor/esctest2/esctest/tests/decset.py -> pkg/te/esctest2_decset_test.go
-- [ ] vendor/esctest2/esctest/tests/decset_more.py -> pkg/te/esctest2_decset_more_test.go
-- [ ] vendor/esctest2/esctest/tests/decset_tite_inhibit.py -> pkg/te/esctest2_decset_tite_inhibit_test.go
-- [ ] vendor/esctest2/esctest/tests/decstbm.py -> pkg/te/esctest2_decstbm_test.go
-- [ ] vendor/esctest2/esctest/tests/decstr.py -> pkg/te/esctest2_decstr_test.go
-- [ ] vendor/esctest2/esctest/tests/dl.py -> pkg/te/esctest2_dl_test.go
-- [ ] vendor/esctest2/esctest/tests/ech.py -> pkg/te/esctest2_ech_test.go
-- [ ] vendor/esctest2/esctest/tests/ed.py -> pkg/te/esctest2_ed_test.go
-- [ ] vendor/esctest2/esctest/tests/el.py -> pkg/te/esctest2_el_test.go
-- [ ] vendor/esctest2/esctest/tests/ff.py -> pkg/te/esctest2_ff_test.go
-- [ ] vendor/esctest2/esctest/tests/hpa.py -> pkg/te/esctest2_hpa_test.go
-- [ ] vendor/esctest2/esctest/tests/hpr.py -> pkg/te/esctest2_hpr_test.go
-- [ ] vendor/esctest2/esctest/tests/hts.py -> pkg/te/esctest2_hts_test.go
-- [ ] vendor/esctest2/esctest/tests/hvp.py -> pkg/te/esctest2_hvp_test.go
-- [ ] vendor/esctest2/esctest/tests/ich.py -> pkg/te/esctest2_ich_test.go
-- [ ] vendor/esctest2/esctest/tests/il.py -> pkg/te/esctest2_il_test.go
-- [ ] vendor/esctest2/esctest/tests/ind.py -> pkg/te/esctest2_ind_test.go
-- [ ] vendor/esctest2/esctest/tests/lf.py -> pkg/te/esctest2_lf_test.go
+- [x] vendor/esctest2/esctest/tests/decset_tite_inhibit.py -> pkg/te/esctest2_decset_tite_inhibit_test.go
+- [x] vendor/esctest2/esctest/tests/decstbm.py -> pkg/te/esctest2_decstbm_test.go
+- [x] vendor/esctest2/esctest/tests/decstr.py -> pkg/te/esctest2_decstr_test.go
+- [x] vendor/esctest2/esctest/tests/dl.py -> pkg/te/esctest2_dl_test.go
+- [x] vendor/esctest2/esctest/tests/ech.py -> pkg/te/esctest2_ech_test.go
+- [x] vendor/esctest2/esctest/tests/ed.py -> pkg/te/esctest2_ed_test.go
+- [x] vendor/esctest2/esctest/tests/el.py -> pkg/te/esctest2_el_test.go
+- [x] vendor/esctest2/esctest/tests/ff.py -> pkg/te/esctest2_ff_test.go
+- [x] vendor/esctest2/esctest/tests/hpa.py -> pkg/te/esctest2_hpa_test.go
+- [x] vendor/esctest2/esctest/tests/hpr.py -> pkg/te/esctest2_hpr_test.go
+- [x] vendor/esctest2/esctest/tests/hts.py -> pkg/te/esctest2_hts_test.go
+- [x] vendor/esctest2/esctest/tests/hvp.py -> pkg/te/esctest2_hvp_test.go
+- [x] vendor/esctest2/esctest/tests/ich.py -> pkg/te/esctest2_ich_test.go
+- [x] vendor/esctest2/esctest/tests/il.py -> pkg/te/esctest2_il_test.go
+- [x] vendor/esctest2/esctest/tests/ind.py -> pkg/te/esctest2_ind_test.go
+- [x] vendor/esctest2/esctest/tests/lf.py -> pkg/te/esctest2_lf_test.go
 - [x] vendor/esctest2/esctest/tests/manipulate_selection_data.py -> pkg/te/esctest2_manipulate_selection_data_test.go
-- [ ] vendor/esctest2/esctest/tests/nel.py -> pkg/te/esctest2_nel_test.go
-- [ ] vendor/esctest2/esctest/tests/pm.py -> pkg/te/esctest2_pm_test.go
-- [ ] vendor/esctest2/esctest/tests/rep.py -> pkg/te/esctest2_rep_test.go
-- [ ] vendor/esctest2/esctest/tests/reset_color.py -> pkg/te/esctest2_reset_color_test.go
-- [ ] vendor/esctest2/esctest/tests/reset_special_color.py -> pkg/te/esctest2_reset_special_color_test.go
-- [ ] vendor/esctest2/esctest/tests/ri.py -> pkg/te/esctest2_ri_test.go
-- [ ] vendor/esctest2/esctest/tests/ris.py -> pkg/te/esctest2_ris_test.go
+- [x] vendor/esctest2/esctest/tests/nel.py -> pkg/te/esctest2_nel_test.go
+- [x] vendor/esctest2/esctest/tests/pm.py -> pkg/te/esctest2_pm_test.go
+- [x] vendor/esctest2/esctest/tests/rep.py -> pkg/te/esctest2_rep_test.go
+- [x] vendor/esctest2/esctest/tests/reset_color.py -> pkg/te/esctest2_reset_color_test.go
+- [x] vendor/esctest2/esctest/tests/reset_special_color.py -> pkg/te/esctest2_reset_special_color_test.go
+- [x] vendor/esctest2/esctest/tests/ri.py -> pkg/te/esctest2_ri_test.go
+- [x] vendor/esctest2/esctest/tests/ris.py -> pkg/te/esctest2_ris_test.go
 - [x] vendor/esctest2/esctest/tests/rm.py -> pkg/te/esctest2_rm_test.go
-- [ ] vendor/esctest2/esctest/tests/s8c1t.py -> pkg/te/esctest2_s8c1t_test.go
+- [x] vendor/esctest2/esctest/tests/s8c1t.py -> pkg/te/esctest2_s8c1t_test.go
 - [x] vendor/esctest2/esctest/tests/save_restore_cursor.py -> pkg/te/esctest2_decrc_test.go + pkg/te/esctest2_scorc_test.go
 - [x] vendor/esctest2/esctest/tests/scorc.py -> pkg/te/esctest2_scorc_test.go
-- [ ] vendor/esctest2/esctest/tests/sd.py -> pkg/te/esctest2_sd_test.go
+- [x] vendor/esctest2/esctest/tests/sd.py -> pkg/te/esctest2_sd_test.go
 - [x] vendor/esctest2/esctest/tests/sgr.py -> pkg/te/esctest2_sgr_test.go
 - [x] vendor/esctest2/esctest/tests/sm.py -> pkg/te/esctest2_sm_test.go
 - [x] vendor/esctest2/esctest/tests/sm_title.py -> pkg/te/esctest2_sm_title_test.go
-- [ ] vendor/esctest2/esctest/tests/sos.py -> pkg/te/esctest2_sos_test.go
-- [ ] vendor/esctest2/esctest/tests/su.py -> pkg/te/esctest2_su_test.go
-- [ ] vendor/esctest2/esctest/tests/tbc.py -> pkg/te/esctest2_tbc_test.go
-- [ ] vendor/esctest2/esctest/tests/vpa.py -> pkg/te/esctest2_vpa_test.go
-- [ ] vendor/esctest2/esctest/tests/vpr.py -> pkg/te/esctest2_vpr_test.go
-- [ ] vendor/esctest2/esctest/tests/vt.py -> pkg/te/esctest2_vt_test.go
-- [ ] vendor/esctest2/esctest/tests/xterm_save.py -> pkg/te/esctest2_xterm_save_test.go
+- [x] vendor/esctest2/esctest/tests/sos.py -> pkg/te/esctest2_sos_test.go
+- [x] vendor/esctest2/esctest/tests/su.py -> pkg/te/esctest2_su_test.go
+- [x] vendor/esctest2/esctest/tests/tbc.py -> pkg/te/esctest2_tbc_test.go
+- [x] vendor/esctest2/esctest/tests/vpa.py -> pkg/te/esctest2_vpa_test.go
+- [x] vendor/esctest2/esctest/tests/vpr.py -> pkg/te/esctest2_vpr_test.go
+- [x] vendor/esctest2/esctest/tests/vt.py -> pkg/te/esctest2_vt_test.go
+- [x] vendor/esctest2/esctest/tests/xterm_save.py -> pkg/te/esctest2_xterm_save_test.go
 - [x] vendor/esctest2/esctest/tests/xterm_winops.py -> pkg/te/esctest2_xterm_winops_test.go

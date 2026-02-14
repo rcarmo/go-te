@@ -21,7 +21,7 @@ func (f esctestXtermWinopsFixture) getIconified(t *testing.T) bool {
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 11)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) == 0 {
 		t.Fatalf("expected window state response")
 	}
@@ -32,7 +32,7 @@ func (f esctestXtermWinopsFixture) getWindowPosition(t *testing.T) esctestPoint 
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 13)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected window position response")
 	}
@@ -43,7 +43,7 @@ func (f esctestXtermWinopsFixture) getWindowSizePixels(t *testing.T) esctestSize
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 14)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected window size response")
 	}
@@ -54,7 +54,7 @@ func (f esctestXtermWinopsFixture) getScreenSizePixels(t *testing.T) esctestSize
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 15)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected screen size response")
 	}
@@ -65,7 +65,7 @@ func (f esctestXtermWinopsFixture) getCharSizePixels(t *testing.T) esctestSize {
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 16)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected char size response")
 	}
@@ -76,7 +76,7 @@ func (f esctestXtermWinopsFixture) getScreenSizeChars(t *testing.T) esctestSize 
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 18)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected text area response")
 	}
@@ -87,7 +87,7 @@ func (f esctestXtermWinopsFixture) getDisplaySizeChars(t *testing.T) esctestSize
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestXtermWinops(t, f.stream, 19)
 	})
-	params := esctestReadCSI(t, response, 't', 0)
+	params := esctestReadCSI(t, response, "t", 0)
 	if len(params) < 3 {
 		t.Fatalf("expected screen size chars response")
 	}

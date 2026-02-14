@@ -275,7 +275,7 @@ func esctestCaptureResponse(screen *Screen, fn func()) string {
 }
 
 func esctestParseCSI(t *testing.T, response string, prefix rune) []int {
-	return esctestReadCSI(t, response, 'c', prefix)
+	return esctestReadCSI(t, response, "c", prefix)
 }
 
 func esctestReadOSC(t *testing.T, response string, prefix string) string {
@@ -358,7 +358,7 @@ func esctestSGR(t *testing.T, stream *Stream, params ...int) {
 	esctestWrite(t, stream, fmt.Sprintf("%s%s%s", ControlCSI, esctestJoinParams(params...), EscSGR))
 }
 
-func esctestReadCSI(t *testing.T, response string, expectedFinal rune, expectedPrefix rune) []int {
+func esctestReadCSI(t *testing.T, response string, expectedFinal string, expectedPrefix rune) []int {
 	if !strings.HasPrefix(response, ControlCSI) {
 		t.Fatalf("expected CSI response, got %q", response)
 	}
@@ -369,10 +369,10 @@ func esctestReadCSI(t *testing.T, response string, expectedFinal rune, expectedP
 		}
 		payload = payload[1:]
 	}
-	if !strings.HasSuffix(payload, string(expectedFinal)) {
-		t.Fatalf("expected CSI final %q, got %q", string(expectedFinal), response)
+	if !strings.HasSuffix(payload, expectedFinal) {
+		t.Fatalf("expected CSI final %q, got %q", expectedFinal, response)
 	}
-	payload = strings.TrimSuffix(payload, string(expectedFinal))
+	payload = strings.TrimSuffix(payload, expectedFinal)
 	if payload == "" {
 		return nil
 	}

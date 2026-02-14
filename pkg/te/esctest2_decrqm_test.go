@@ -17,14 +17,14 @@ func (f esctestDecrqmFixture) requestAnsiMode(t *testing.T, mode int) []int {
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestDECRQM(t, f.stream, mode, false)
 	})
-	return esctestReadCSI(t, response, 'y', 0)
+	return esctestReadCSI(t, response, "$y", 0)
 }
 
 func (f esctestDecrqmFixture) requestDecMode(t *testing.T, mode int) []int {
 	response := esctestCaptureResponse(f.screen, func() {
 		esctestDECRQM(t, f.stream, mode, true)
 	})
-	return esctestReadCSI(t, response, 'y', '?')
+	return esctestReadCSI(t, response, "$y", '?')
 }
 
 func (f esctestDecrqmFixture) doModifiableAnsiTest(t *testing.T, mode int) {
