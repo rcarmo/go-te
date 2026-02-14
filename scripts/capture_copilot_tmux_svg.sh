@@ -95,8 +95,8 @@ if [[ "$INCLUDE_STATUS" == "1" ]]; then
   status_line=${status_line:0:$pane_width}
   cp "$PANE_CAPTURE" "$CAPTURE_FILE"
   if [[ -s "$CAPTURE_FILE" ]]; then
-    last_char=$(tail -c 1 "$CAPTURE_FILE" || true)
-    if [[ "$last_char" != $'\n' ]]; then
+    last_byte=$(tail -c 1 "$CAPTURE_FILE" | od -An -t u1 | tr -d ' ')
+    if [[ "$last_byte" != "10" ]]; then
       printf "\n" >> "$CAPTURE_FILE"
     fi
   fi
