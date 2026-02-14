@@ -8,8 +8,10 @@ import (
 	"unicode/utf8"
 )
 
+// ErrNoListener is returned when no event handler is attached.
 var ErrNoListener = errors.New("listener is not set")
 
+// EventHandler defines callbacks used by Stream to update a screen.
 type EventHandler interface {
 	Bell()
 	Backspace()
@@ -95,6 +97,7 @@ type EventHandler interface {
 	WindowOp(params []int)
 }
 
+// Stream parses escape sequences and dispatches events.
 type Stream struct {
 	listener        EventHandler
 	strict          bool
@@ -132,6 +135,7 @@ const (
 	stateEscapeSpace
 )
 
+// NewStream creates a Stream for the provided event handler.
 func NewStream(screen EventHandler, strict bool) *Stream {
 	st := &Stream{strict: strict, useUTF8: true}
 	if screen != nil {
@@ -140,6 +144,7 @@ func NewStream(screen EventHandler, strict bool) *Stream {
 	return st
 }
 
+// Attach registers an event handler with the stream.
 func (st *Stream) Attach(screen EventHandler) {
 	st.listener = screen
 	st.state = stateGround
@@ -157,16 +162,19 @@ func (st *Stream) Attach(screen EventHandler) {
 	st.paramStrings = nil
 }
 
+// Detach removes an event handler from the stream.
 func (st *Stream) Detach(screen EventHandler) {
 	if st.listener == screen {
 		st.listener = nil
 	}
 }
 
+// Feed processes terminal input.
 func (st *Stream) Feed(data string) (err error) {
 	return st.FeedBytes([]byte(data))
 }
 
+// FeedBytes processes a byte slice of terminal input.
 func (st *Stream) FeedBytes(data []byte) (err error) {
 	if st.listener == nil {
 		return ErrNoListener
@@ -908,6 +916,7 @@ func (st *Stream) dispatchCSI(final rune, params []int) {
 	}
 }
 
+// SelectOtherCharset switches to the specified character set.
 func (st *Stream) SelectOtherCharset(code string) {
 	if code == "@" {
 		st.useUTF8 = false

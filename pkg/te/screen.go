@@ -11,11 +11,13 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+// Margins defines the top and bottom scroll region.
 type Margins struct {
 	Top    int
 	Bottom int
 }
 
+// Savepoint captures cursor and state for save/restore operations.
 type Savepoint struct {
 	Cursor   Cursor
 	G0       []rune
@@ -27,6 +29,7 @@ type Savepoint struct {
 	SavedCol *int
 }
 
+// Screen models a terminal screen buffer.
 type Screen struct {
 	Columns             int
 	Lines               int
@@ -82,6 +85,7 @@ type Screen struct {
 	altSavedCursor *Cursor
 }
 
+// NewScreen creates a Screen with the specified dimensions.
 func NewScreen(cols, lines int) *Screen {
 	s := &Screen{}
 	s.Resize(lines, cols)
@@ -89,6 +93,7 @@ func NewScreen(cols, lines int) *Screen {
 	return s
 }
 
+// Reset resets the screen state to defaults.
 func (s *Screen) Reset() {
 	if s.SavedColumns != nil {
 		s.Resize(s.Lines, *s.SavedColumns)
@@ -159,6 +164,7 @@ func (s *Screen) Reset() {
 	}
 }
 
+// Resize executes the resize operation.
 func (s *Screen) Resize(lines, columns int) {
 	if lines <= 0 {
 		lines = 1
@@ -275,6 +281,7 @@ func (s *Screen) Resize(lines, columns int) {
 	}
 }
 
+// Display returns the screen contents as strings.
 func (s *Screen) Display() []string {
 	lines := make([]string, s.Lines)
 	for row := 0; row < s.Lines; row++ {
@@ -304,6 +311,7 @@ func (s *Screen) Display() []string {
 	return lines
 }
 
+// LinesCells returns a copy of the screen cell buffer.
 func (s *Screen) LinesCells() [][]Cell {
 	lines := make([][]Cell, s.Lines)
 	for row := range s.Buffer {
@@ -312,6 +320,7 @@ func (s *Screen) LinesCells() [][]Cell {
 	return lines
 }
 
+// Draw renders text at the current cursor position.
 func (s *Screen) Draw(data string) {
 	data = s.translate(data)
 	graphemes := uniseg.NewGraphemes(data)
@@ -383,14 +392,17 @@ loop:
 	s.Dirty[s.Cursor.Row] = struct{}{}
 }
 
+// SetTitle updates the window title.
 func (s *Screen) SetTitle(param string) {
 	s.Title = s.applyTitleModes(param)
 }
 
+// SetIconName updates the icon name.
 func (s *Screen) SetIconName(param string) {
 	s.IconName = s.applyTitleModes(param)
 }
 
+// CarriageReturn moves the cursor to column zero.
 func (s *Screen) CarriageReturn() {
 	s.wrapNext = false
 	if s.isModeSet(ModeDECLRMM) {
@@ -408,6 +420,7 @@ func (s *Screen) CarriageReturn() {
 	s.Cursor.Col = 0
 }
 
+// Index performs an index (scroll up) operation.
 func (s *Screen) Index() {
 	s.wrapNext = false
 	top, bottom := s.scrollRegion()
@@ -431,6 +444,7 @@ func (s *Screen) Index() {
 	}
 }
 
+// ReverseIndex performs a reverse index operation.
 func (s *Screen) ReverseIndex() {
 	s.wrapNext = false
 	top, bottom := s.scrollRegion()
@@ -454,6 +468,7 @@ func (s *Screen) ReverseIndex() {
 	}
 }
 
+// LineFeed moves the cursor down and optionally scrolls.
 func (s *Screen) LineFeed() {
 	s.wrapNext = false
 	if !s.canScrollHorizontal() {
@@ -473,6 +488,7 @@ func (s *Screen) LineFeed() {
 	}
 }
 
+// Tab moves the cursor to the next tab stop.
 func (s *Screen) Tab() {
 	keepWrap := s.wrapNext && !s.isModeSet(ModeMoreFix)
 	if s.wrapNext && s.isModeSet(ModeMoreFix) {
@@ -500,14 +516,17 @@ func (s *Screen) Tab() {
 	}
 }
 
+// Backspace moves the cursor left.
 func (s *Screen) Backspace() {
 	s.moveLeft(1, true)
 }
 
+// SaveCursor saves cursor.
 func (s *Screen) SaveCursor() {
 	s.saveCursorState(true)
 }
 
+// SaveCursorDEC saves cursor dec.
 func (s *Screen) SaveCursorDEC() {
 	s.saveCursorState(false)
 }
@@ -532,10 +551,12 @@ func (s *Screen) saveCursorState(restoreWrap bool) {
 	})
 }
 
+// RestoreCursor restores cursor.
 func (s *Screen) RestoreCursor() {
 	s.restoreCursorState(true)
 }
 
+// RestoreCursorDEC restores cursor dec.
 func (s *Screen) RestoreCursorDEC() {
 	s.restoreCursorState(false)
 }
@@ -575,6 +596,7 @@ func (s *Screen) restoreCursorState(restoreWrap bool) {
 	s.ensureVB(true)
 }
 
+// InsertLines inserts blank lines at the cursor.
 func (s *Screen) InsertLines(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -604,6 +626,7 @@ func (s *Screen) InsertLines(params ...int) {
 	s.CarriageReturn()
 }
 
+// DeleteLines deletes lines at the cursor.
 func (s *Screen) DeleteLines(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -634,6 +657,7 @@ func (s *Screen) DeleteLines(params ...int) {
 	s.CarriageReturn()
 }
 
+// InsertCharacters inserts blank characters.
 func (s *Screen) InsertCharacters(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -669,6 +693,7 @@ func (s *Screen) InsertCharacters(params ...int) {
 	}
 }
 
+// DeleteCharacters deletes characters at the cursor.
 func (s *Screen) DeleteCharacters(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -704,6 +729,7 @@ func (s *Screen) DeleteCharacters(params ...int) {
 	}
 }
 
+// EraseCharacters erases characters at the cursor.
 func (s *Screen) EraseCharacters(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -728,6 +754,7 @@ func (s *Screen) EraseCharacters(params ...int) {
 	}
 }
 
+// EraseInLine erases portions of the current line.
 func (s *Screen) EraseInLine(how int, private bool, _ ...int) {
 	s.Dirty[s.Cursor.Row] = struct{}{}
 	line := s.Buffer[s.Cursor.Row]
@@ -757,10 +784,12 @@ func (s *Screen) EraseInLine(how int, private bool, _ ...int) {
 	}
 }
 
+// EraseInDisplay erases portions of the display.
 func (s *Screen) EraseInDisplay(how int, private bool, _ ...int) {
 	s.eraseInDisplay(how, private, false)
 }
 
+// EraseInDisplaySelective performs selective display erase.
 func (s *Screen) EraseInDisplaySelective(how int) {
 	s.eraseInDisplay(how, true, true)
 }
@@ -806,31 +835,38 @@ func (s *Screen) eraseInDisplay(how int, private bool, selective bool) {
 	}
 }
 
+// SetTabStop adds a tab stop at the cursor column.
 func (s *Screen) SetTabStop() {
 	s.TabStops[s.Cursor.Col] = struct{}{}
 }
 
+// StartProtectedArea enables ISO protected mode.
 func (s *Screen) StartProtectedArea() {
 	s.Cursor.Attr.ISOProtected = true
 }
 
+// EndProtectedArea disables ISO protected mode.
 func (s *Screen) EndProtectedArea() {
 	s.Cursor.Attr.ISOProtected = false
 }
 
+// SetCharacterProtection updates character protection mode.
 func (s *Screen) SetCharacterProtection(mode int) {
 	s.charProtectionMode = mode
 	s.Cursor.Attr.Protected = mode == 1
 }
 
+// SetCursorStyle updates the cursor style setting.
 func (s *Screen) SetCursorStyle(style int) {
 	s.cursorStyle = style
 }
 
+// SetActiveStatusDisplay sets the active status display mode.
 func (s *Screen) SetActiveStatusDisplay(mode int) {
 	s.statusDisplay = mode
 }
 
+// ClearTabStop clears tab stops based on the given mode.
 func (s *Screen) ClearTabStop(how ...int) {
 	value := 0
 	if len(how) > 0 {
@@ -844,11 +880,13 @@ func (s *Screen) ClearTabStop(how ...int) {
 	}
 }
 
+// EnsureCursor clamps the cursor within bounds.
 func (s *Screen) EnsureCursor() {
 	s.ensureHB()
 	s.ensureVB(false)
 }
 
+// CursorUp moves the cursor up by a count.
 func (s *Screen) CursorUp(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -866,12 +904,14 @@ func (s *Screen) CursorUp(params ...int) {
 	s.Cursor.Row = maxInt(s.Cursor.Row-count, limitTop)
 }
 
+// CursorUp1 moves the cursor up and to column one.
 func (s *Screen) CursorUp1(params ...int) {
 	s.wrapNext = false
 	s.CursorUp(params...)
 	s.CarriageReturn()
 }
 
+// CursorDown moves the cursor down by a count.
 func (s *Screen) CursorDown(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -889,12 +929,14 @@ func (s *Screen) CursorDown(params ...int) {
 	s.Cursor.Row = minInt(s.Cursor.Row+count, limitBottom)
 }
 
+// CursorDown1 moves the cursor down and to column one.
 func (s *Screen) CursorDown1(params ...int) {
 	s.wrapNext = false
 	s.CursorDown(params...)
 	s.CarriageReturn()
 }
 
+// CursorBack moves the cursor backward by a count.
 func (s *Screen) CursorBack(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -903,6 +945,7 @@ func (s *Screen) CursorBack(params ...int) {
 	s.moveLeft(count, true)
 }
 
+// CursorBackTab moves the cursor to the previous tab stop.
 func (s *Screen) CursorBackTab(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -923,6 +966,7 @@ func (s *Screen) CursorBackTab(params ...int) {
 	}
 }
 
+// CursorForwardTab moves the cursor to the next tab stop.
 func (s *Screen) CursorForwardTab(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -937,6 +981,7 @@ func (s *Screen) CursorForwardTab(params ...int) {
 	}
 }
 
+// NextLine performs a line feed followed by carriage return.
 func (s *Screen) NextLine() {
 	s.wrapNext = false
 	origCol := s.Cursor.Col
@@ -1030,6 +1075,7 @@ func (s *Screen) reverseWrapToPreviousLine(left, right int, reverseInline, rever
 	s.Cursor.Col = right
 }
 
+// CursorForward moves the cursor forward by a count.
 func (s *Screen) CursorForward(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -1047,6 +1093,7 @@ func (s *Screen) CursorForward(params ...int) {
 	s.Cursor.Col = minInt(s.Cursor.Col+count, s.Columns-1)
 }
 
+// ScrollUp scrolls the screen up.
 func (s *Screen) ScrollUp(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -1069,6 +1116,7 @@ func (s *Screen) ScrollUp(params ...int) {
 	}
 }
 
+// ScrollDown scrolls the screen down.
 func (s *Screen) ScrollDown(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -1091,6 +1139,7 @@ func (s *Screen) ScrollDown(params ...int) {
 	}
 }
 
+// RepeatLast repeats the last drawn character.
 func (s *Screen) RepeatLast(params ...int) {
 	count := 1
 	if len(params) > 0 {
@@ -1107,6 +1156,7 @@ func (s *Screen) RepeatLast(params ...int) {
 	}
 }
 
+// CursorPosition moves the cursor to a line and column.
 func (s *Screen) CursorPosition(params ...int) {
 	line := 0
 	column := 0
@@ -1143,6 +1193,7 @@ func (s *Screen) CursorPosition(params ...int) {
 	s.ensureVB(false)
 }
 
+// CursorToColumn moves the cursor to a column.
 func (s *Screen) CursorToColumn(column ...int) {
 	value := 1
 	if len(column) > 0 {
@@ -1160,6 +1211,7 @@ func (s *Screen) CursorToColumn(column ...int) {
 	s.ensureHB()
 }
 
+// CursorToColumnAbsolute moves the cursor to an absolute column.
 func (s *Screen) CursorToColumnAbsolute(column ...int) {
 	value := 1
 	if len(column) > 0 {
@@ -1179,6 +1231,7 @@ func (s *Screen) CursorToColumnAbsolute(column ...int) {
 	s.Cursor.Col = col
 }
 
+// CursorToLine moves the cursor to a line.
 func (s *Screen) CursorToLine(params ...int) {
 	line := 1
 	if len(params) > 0 {
@@ -1196,9 +1249,11 @@ func (s *Screen) CursorToLine(params ...int) {
 	s.ensureVB(false)
 }
 
+// Bell triggers the terminal bell.
 func (s *Screen) Bell() {
 }
 
+// AlignmentDisplay fills the screen with the alignment pattern.
 func (s *Screen) AlignmentDisplay() {
 	s.markDirtyRange(0, s.Lines-1)
 	for row := 0; row < s.Lines; row++ {
@@ -1216,6 +1271,7 @@ func (s *Screen) AlignmentDisplay() {
 	s.CursorPosition(0, 0)
 }
 
+// SelectGraphicRendition selects graphic rendition.
 func (s *Screen) SelectGraphicRendition(attrs []int, private bool) {
 	if private {
 		return
@@ -1312,6 +1368,7 @@ func (s *Screen) SelectGraphicRendition(attrs []int, private bool) {
 	s.Cursor.Attr = replace
 }
 
+// ReportDeviceAttributes emits a device attributes response.
 func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune, _ ...int) {
 	if mode != 0 {
 		return
@@ -1362,6 +1419,7 @@ func (s *Screen) ReportDeviceAttributes(mode int, private bool, prefix rune, _ .
 	}
 }
 
+// ReportDeviceStatus emits a device status response.
 func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ...int) {
 	if private && prefix == '?' {
 		switch mode {
@@ -1447,6 +1505,7 @@ func (s *Screen) ReportDeviceStatus(mode int, private bool, prefix rune, rest ..
 	}
 }
 
+// ReportMode emits a mode status report.
 func (s *Screen) ReportMode(mode int, private bool) {
 	if s.conformanceExplicit && s.conformanceLevel < 3 {
 		return
@@ -1479,6 +1538,7 @@ func (s *Screen) ReportMode(mode int, private bool) {
 	s.WriteProcessInput(ControlCSI + fmt.Sprintf("%s%d;%d$y", prefix, mode, status))
 }
 
+// RequestStatusString responds to DECRQSS queries.
 func (s *Screen) RequestStatusString(query string) {
 	if query == "" {
 		return
@@ -1546,6 +1606,7 @@ func (s *Screen) RequestStatusString(query string) {
 	s.WriteProcessInput(ControlDCS + response + ControlST)
 }
 
+// SoftReset resets state without a full reset.
 func (s *Screen) SoftReset() {
 	s.wrapNext = false
 	s.Cursor.Hidden = false
@@ -1574,6 +1635,7 @@ func (s *Screen) SoftReset() {
 	s.iconStack = nil
 }
 
+// SaveModes saves the current mode settings.
 func (s *Screen) SaveModes(modes []int) {
 	if s.savedModes == nil {
 		s.savedModes = make(map[int]bool)
@@ -1585,6 +1647,7 @@ func (s *Screen) SaveModes(modes []int) {
 	}
 }
 
+// RestoreModes restores saved mode settings.
 func (s *Screen) RestoreModes(modes []int) {
 	for _, mode := range modes {
 		key := mode << 5
@@ -1600,6 +1663,7 @@ func (s *Screen) RestoreModes(modes []int) {
 	}
 }
 
+// ForwardIndex scrolls forward within the scroll region.
 func (s *Screen) ForwardIndex() {
 	left, right := s.horizontalMargins()
 	top, bottom := s.scrollRegion()
@@ -1618,6 +1682,7 @@ func (s *Screen) ForwardIndex() {
 	s.shiftHorizontal(left, right, top, bottom, -1)
 }
 
+// BackIndex scrolls backward within the scroll region.
 func (s *Screen) BackIndex() {
 	left, right := s.horizontalMargins()
 	top, bottom := s.scrollRegion()
@@ -1636,6 +1701,7 @@ func (s *Screen) BackIndex() {
 	s.shiftHorizontal(left, right, top, bottom, 1)
 }
 
+// InsertColumns inserts columns.
 func (s *Screen) InsertColumns(count int) {
 	if count <= 0 {
 		count = 1
@@ -1665,6 +1731,7 @@ func (s *Screen) InsertColumns(count int) {
 	}
 }
 
+// DeleteColumns deletes columns.
 func (s *Screen) DeleteColumns(count int) {
 	if count <= 0 {
 		count = 1
@@ -1694,10 +1761,12 @@ func (s *Screen) DeleteColumns(count int) {
 	}
 }
 
+// EraseRectangle erases a rectangular area.
 func (s *Screen) EraseRectangle(top, left, bottom, right int) {
 	s.fillRectangle(top, left, bottom, right, " ")
 }
 
+// SelectiveEraseRectangle selectively erases a rectangular area.
 func (s *Screen) SelectiveEraseRectangle(top, left, bottom, right int) {
 	if top <= 0 {
 		top = 1
@@ -1746,6 +1815,7 @@ func (s *Screen) SelectiveEraseRectangle(top, left, bottom, right int) {
 	}
 }
 
+// FillRectangle fills a rectangle with the given rune.
 func (s *Screen) FillRectangle(ch rune, top, left, bottom, right int) {
 	if ch == 0 {
 		return
@@ -1852,6 +1922,7 @@ func (s *Screen) fillRectangle(top, left, bottom, right int, data string) {
 	}
 }
 
+// CopyRectangle copies a rectangle within the screen.
 func (s *Screen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dstLeft int) {
 	if srcTop <= 0 {
 		srcTop = 1
@@ -1922,6 +1993,7 @@ func (s *Screen) CopyRectangle(srcTop, srcLeft, srcBottom, srcRight, dstTop, dst
 	}
 }
 
+// SetSelectionData stores OSC 52 selection data.
 func (s *Screen) SetSelectionData(selection, data string) {
 	if selection == "" {
 		selection = "s0"
@@ -1932,6 +2004,7 @@ func (s *Screen) SetSelectionData(selection, data string) {
 	s.selectionData[selection] = data
 }
 
+// QuerySelectionData replies with OSC 52 selection data.
 func (s *Screen) QuerySelectionData(selection string) {
 	if selection == "" {
 		selection = "s0"
@@ -1945,6 +2018,7 @@ func (s *Screen) QuerySelectionData(selection string) {
 	s.WriteProcessInput(ControlOSC + "52;" + selection + ";" + data + ControlST)
 }
 
+// SetColor updates a palette color.
 func (s *Screen) SetColor(index int, value string) {
 	normalized, ok := normalizeColorSpec(value)
 	if !ok {
@@ -1966,6 +2040,7 @@ func (s *Screen) SetColor(index int, value string) {
 	s.colorPalette[index] = normalized
 }
 
+// QueryColor queries a palette color.
 func (s *Screen) QueryColor(index int) {
 	value := "rgb:0000/0000/0000"
 	if s.indexedColors == 0 {
@@ -1988,6 +2063,7 @@ func (s *Screen) QueryColor(index int) {
 	s.WriteProcessInput(ControlOSC + fmt.Sprintf("4;%d;%s", index, value) + ControlST)
 }
 
+// ResetColor resets palette colors.
 func (s *Screen) ResetColor(index int, all bool) {
 	if s.colorPalette == nil {
 		return
@@ -1999,6 +2075,7 @@ func (s *Screen) ResetColor(index int, all bool) {
 	delete(s.colorPalette, index)
 }
 
+// SetDynamicColor updates a dynamic color slot.
 func (s *Screen) SetDynamicColor(index int, value string) {
 	normalized, ok := normalizeColorSpec(value)
 	if !ok {
@@ -2010,6 +2087,7 @@ func (s *Screen) SetDynamicColor(index int, value string) {
 	s.dynamicColors[index] = normalized
 }
 
+// QueryDynamicColor queries a dynamic color slot.
 func (s *Screen) QueryDynamicColor(index int) {
 	value := "rgb:0000/0000/0000"
 	if s.dynamicColors != nil {
@@ -2020,6 +2098,7 @@ func (s *Screen) QueryDynamicColor(index int) {
 	s.WriteProcessInput(ControlOSC + fmt.Sprintf("%d;%s", index, value) + ControlST)
 }
 
+// SetSpecialColor updates a special color slot.
 func (s *Screen) SetSpecialColor(index int, value string) {
 	normalized, ok := normalizeColorSpec(value)
 	if !ok {
@@ -2031,6 +2110,7 @@ func (s *Screen) SetSpecialColor(index int, value string) {
 	s.specialColors[index] = normalized
 }
 
+// QuerySpecialColor queries a special color slot.
 func (s *Screen) QuerySpecialColor(index int) {
 	value := "rgb:0000/0000/0000"
 	if s.specialColors != nil {
@@ -2041,6 +2121,7 @@ func (s *Screen) QuerySpecialColor(index int) {
 	s.WriteProcessInput(ControlOSC + fmt.Sprintf("5;%d;%s", index, value) + ControlST)
 }
 
+// ResetSpecialColor resets special color slots.
 func (s *Screen) ResetSpecialColor(index int, all bool) {
 	if s.specialColors == nil {
 		return
@@ -2052,6 +2133,7 @@ func (s *Screen) ResetSpecialColor(index int, all bool) {
 	delete(s.specialColors, index)
 }
 
+// ResetDynamicColor resets dynamic color slots.
 func (s *Screen) ResetDynamicColor(index int, all bool) {
 	if s.dynamicColors == nil {
 		return
@@ -2168,6 +2250,7 @@ func encodeHexString(input string) string {
 	return b.String()
 }
 
+// SetTitleMode updates title query/set behavior.
 func (s *Screen) SetTitleMode(params []int, reset bool) {
 	if len(params) == 0 {
 		return
@@ -2197,6 +2280,7 @@ func (s *Screen) SetTitleMode(params []int, reset bool) {
 	}
 }
 
+// SetConformance updates the VT conformance level.
 func (s *Screen) SetConformance(level int, sevenBit int) {
 	if level >= 60 {
 		level -= 60
@@ -2211,6 +2295,7 @@ func (s *Screen) SetConformance(level int, sevenBit int) {
 	_ = sevenBit
 }
 
+// WindowOp handles window operations.
 func (s *Screen) WindowOp(params []int) {
 	if len(params) == 0 {
 		return
@@ -2350,9 +2435,11 @@ func (s *Screen) WindowOp(params []int) {
 	}
 }
 
+// Debug handles debug control sequences.
 func (s *Screen) Debug(_ ...interface{}) {
 }
 
+// DefineCharset executes the define charset operation.
 func (s *Screen) DefineCharset(code, mode string) {
 	mapping, ok := charsetMaps[code]
 	if !ok {
@@ -2365,14 +2452,17 @@ func (s *Screen) DefineCharset(code, mode string) {
 	}
 }
 
+// ShiftIn selects the G0 character set.
 func (s *Screen) ShiftIn() {
 	s.Charset = 0
 }
 
+// ShiftOut selects the G1 character set.
 func (s *Screen) ShiftOut() {
 	s.Charset = 1
 }
 
+// SetMargins sets the top and bottom scrolling margins.
 func (s *Screen) SetMargins(params ...int) {
 	top := 0
 	bottom := 0
@@ -2406,6 +2496,7 @@ func (s *Screen) SetMargins(params ...int) {
 	}
 }
 
+// SetLeftRightMargins sets left/right scrolling margins.
 func (s *Screen) SetLeftRightMargins(left, right int) {
 	if !s.isModeSet(ModeDECLRMM) {
 		return
@@ -2431,12 +2522,14 @@ func (s *Screen) SetLeftRightMargins(left, right int) {
 	}
 }
 
+// SetMode enables one or more terminal modes.
 func (s *Screen) SetMode(modes []int, private bool) {
 	for _, mode := range modes {
 		s.applySetMode(mode, private)
 	}
 }
 
+// ResetMode disables one or more terminal modes.
 func (s *Screen) ResetMode(modes []int, private bool) {
 	for _, mode := range modes {
 		s.applyResetMode(mode, private)

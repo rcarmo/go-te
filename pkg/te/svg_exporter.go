@@ -9,13 +9,20 @@ import (
 )
 
 const (
+	// DefaultSVGForeground is the default SVG foreground color.
 	DefaultSVGForeground = "#d3d7cf"
+	// DefaultSVGBackground is the default SVG background color.
 	DefaultSVGBackground = "#000000"
+	// DefaultSVGFontFamily is the default SVG font family.
 	DefaultSVGFontFamily = "ui-monospace, \"SFMono-Regular\", \"FiraCode Nerd Font\", \"FiraMono Nerd Font\", \"Fira Code\", \"Roboto Mono\", Menlo, Monaco, Consolas, \"Liberation Mono\", \"DejaVu Sans Mono\", \"Courier New\", monospace"
-	DefaultSVGFontSize   = 14
+	// DefaultSVGFontSize is the default SVG font size.
+	DefaultSVGFontSize = 14
+	// DefaultSVGLineHeight is the default SVG line height.
 	DefaultSVGLineHeight = 1.2
-	DefaultSVGCharWidth  = 8
-	DefaultSVGPadding    = 10
+	// DefaultSVGCharWidth is the default SVG character width.
+	DefaultSVGCharWidth = 8
+	// DefaultSVGPadding is the default SVG padding.
+	DefaultSVGPadding = 10
 )
 
 var ansiSVGColors = map[string]string{
@@ -45,6 +52,7 @@ var ansiSVGColors = map[string]string{
 
 var boxDrawingChars = "─━│┃┄┅┆┇┈┉┊┋┌┍┎┏┐┑┒┓└┕┖┗┘┙┚┛├┝┞┟┠┡┢┣┤┥┦┧┨┩┪┫┬┭┮┯┰┱┲┳┴┵┶┷┸┹┺┻┼┽┾┿╀╁╂╃╄╅╆╇╈╉╊╋═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬╭╮╯╰╱╲╳╴╵╶╷╸╹╺╻╼╽╾╿"
 
+// SVGOptions configures SVG rendering.
 type SVGOptions struct {
 	Title      string
 	FontFamily string
@@ -57,6 +65,7 @@ type SVGOptions struct {
 	Palette    map[string]string
 }
 
+// DefaultSVGOptions returns default SVG rendering options.
 func DefaultSVGOptions() SVGOptions {
 	return SVGOptions{
 		Title:      "Terminal",
@@ -70,6 +79,7 @@ func DefaultSVGOptions() SVGOptions {
 	}
 }
 
+// RenderScreenSVG renders a Screen as SVG.
 func RenderScreenSVG(screen *Screen, opts SVGOptions) string {
 	if screen == nil {
 		return ""
@@ -77,6 +87,7 @@ func RenderScreenSVG(screen *Screen, opts SVGOptions) string {
 	return RenderTerminalSVG(screen.Buffer, screen.Columns, screen.Lines, opts)
 }
 
+// RenderTerminalSVG renders a cell buffer as SVG.
 func RenderTerminalSVG(screenBuffer [][]Cell, width, height int, opts SVGOptions) string {
 	opts = normalizeSVGOptions(opts)
 	palette := normalizePalette(opts.Palette)

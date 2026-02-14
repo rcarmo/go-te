@@ -62,7 +62,9 @@ var bgAixterm = map[int]string{
 }
 
 const (
+	// SgrFg256 selects 256-color foreground mode in SGR.
 	SgrFg256 = 38
+	// SgrBg256 selects 256-color background mode in SGR.
 	SgrBg256 = 48
 )
 
