@@ -1,6 +1,6 @@
 # Pyte Port Test Coverage
 
-This document summarizes the behaviors covered by the Go port of the **pyte** test suite. It is meant as a high-level guide to what the port exercises and how it maps to emulator behavior. For exact test mappings, see `TEST_AUDIT_CHECKLIST.md` and `PYTE_PORTING_CONVENTION.md`.
+This document summarizes the behaviors covered by the Go port of the **pyte** test suite. It is meant as a high-level guide to what the port exercises and how it maps to emulator behavior. For exact test mappings, see `docs/TEST_AUDIT_CHECKLIST.md` and `docs/PYTE_PORTING_CONVENTION.md`.
 
 ## Screen & Cursor Behavior
 - **Reset and defaults**: full reset, soft reset, default attributes, and cursor state.

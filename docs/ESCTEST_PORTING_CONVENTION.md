@@ -7,7 +7,7 @@ These guidelines mirror the pyte porting conventions, adapted for the esctest2 s
    - Go tests must be a 1:1 semantic translation of the Python tests.
    - Do not “fix” a test to make it pass; fix emulator behavior instead.
 2. **Do not modify vendored tests.**
-   - Keep `/workspace/vendor/esctest2` untouched. All changes belong in Go files.
+   - Keep `vendor/esctest2` untouched. All changes belong in Go files.
 3. **Follow naming conventions.**
    - Use a deterministic test name that encodes the Python file and test name.
    - Recommended format: `TestEsctest<PyFileBaseCamel><PyTestNameCamel>`.
@@ -62,5 +62,6 @@ These guidelines mirror the pyte porting conventions, adapted for the esctest2 s
 4. Repeat until the Python file’s tests all pass.
 
 ## References
-- Vendored tests: `/workspace/vendor/esctest2/esctest/tests`
-- Helpers: `/workspace/esctest2_helpers_test.go`
+- Vendored tests: `vendor/esctest2/esctest/tests`
+- Helpers: `pkg/te/esctest2_helpers_test.go`
+- Checklist: `docs/TEST_AUDIT_CHECKLIST.md`
