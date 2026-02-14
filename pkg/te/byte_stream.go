@@ -21,7 +21,9 @@ func (st *ByteStream) Feed(data []byte) error {
 		for len(st.buffer) > 0 {
 			r, size := utf8.DecodeRune(st.buffer)
 			if r == utf8.RuneError && size == 1 {
-				break
+				out = append(out, rune(st.buffer[0]))
+				st.buffer = st.buffer[1:]
+				continue
 			}
 			st.buffer = st.buffer[size:]
 			out = append(out, r)
