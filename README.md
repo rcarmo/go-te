@@ -2,11 +2,11 @@
 
 ![go-te icon](docs/icon-256.png)
 
-`go-te` is a Go terminal emulator library that models a VT100/VT220/VT520-style screen. It is a faithful port of the Python [pyte](https://github.com/selectel/pyte) test suite with additional coverage from the ESCTest2 conformance tests. The library focuses on deterministic, in-memory screen state suitable for screen scraping, TUI rendering, and playback.
+`go-te` is a Go terminal emulator library that models a VT100/VT220/VT520-style screen. It is a faithful port of the Python [pyte](https://github.com/selectel/pyte) test suite with additional coverage from the [ESCTest2](https://github.com/ThomasDickey/esctest2) conformance tests. The library focuses on deterministic, in-memory screen state suitable for screen scraping, TUI rendering, and playback, and is used in [`webterm`](https://github.com/rcarmo/webterm) to provide live terminal previews.
 
 ## Highlights
 - **Pyte fidelity**: The Go implementation follows pyte semantics and test behavior 1:1.
-- **ESCTest2 coverage**: Comprehensive CSI/OSC/DSR behavior is validated through upstream tests.
+- **[ESCTest2](https://github.com/ThomasDickey/esctest2) coverage**: Comprehensive CSI/OSC/DSR behavior is validated through upstream tests.
 - **Multiple screen variants**: Base, diff (dirty tracking), history (scrollback), and debug screens.
 - **Alternate buffer support**: Primary/alternate buffers with cursor save/restore.
 - **SVG rendering**: Export screen buffers to SVG for screenshots or reports.
